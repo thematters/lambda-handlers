@@ -42,7 +42,7 @@ WHERE state='active'
   AND age(draft.created_at) <= interval '1 week'
 -- ORDER BY RANDOM() LIMIT 3 ;
 ORDER BY draft.created_at DESC
-LIMIT 3 -- LIMIT $ {take} OFFSET $ {skip}
+LIMIT ${take} OFFSET ${skip}
 `.cursor(batchSize);
   }
 

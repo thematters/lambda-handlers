@@ -16,8 +16,8 @@ export function instanceOfNodeError<T extends new (...args: any) => Error>(
 
 // searchKey is a sample search key
 export async function refreshSearchIndexUser(
-  searchKey: string = "user",
-  reCreate: boolean = false
+  searchKey = "user",
+  reCreate = false
 ) {
   // const [{ version, now }] = await sql` SELECT VERSION(), NOW() `; console.log("pgres:", { version, now });
 
@@ -84,8 +84,8 @@ LIMIT 100 ;`;
 
 // searchKey is a sample search key
 export async function refreshSearchIndexTag(
-  searchKey: string = "tag",
-  reCreate: boolean = false
+  searchKey = "tag",
+  reCreate = false
 ) {
   const [{ version, now }] = await sql` SELECT VERSION(), NOW() `;
   console.log("pgres:", { version, now });

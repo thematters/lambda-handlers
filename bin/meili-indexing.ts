@@ -1,8 +1,7 @@
 #!/usr/bin/env -S node --trace-warnings --loader ts-node/esm
 
-import postgres from "postgres";
-import { MeiliSearch } from "meilisearch";
-
+// import postgres from "postgres";
+// import { MeiliSearch } from "meilisearch";
 
 import {
   dbApi,
@@ -13,7 +12,7 @@ import { articlesIndexer, Article } from "../lib/meili-indexer.js";
 async function main() {
   const started = Date.now();
   let total = 0;
-  for await (const articles of dbApi.listArticles({ take: 5, skip: 0 })) {
+  for await (const articles of dbApi.listArticles({ take: 150, skip: 0 })) {
     const res = await articlesIndexer.addToSearch(articles);
     console.log(
       new Date(),
