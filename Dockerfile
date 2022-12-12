@@ -7,6 +7,7 @@ WORKDIR /usr/app
 COPY package*.json ./
 RUN npm install
 COPY ./lib ./lib
+COPY ./bin ./bin
 COPY ./handlers ./handlers
 COPY ./tsconfig.json ./*.ts ./
 RUN npm run build
