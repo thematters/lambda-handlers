@@ -1,79 +1,156 @@
-name: Deployment
+name: Build & Deploy
 
 on:
-  push:
-    branches-ignore:
-      - develop
-      - main
-      - master
-      - stage
   pull_request:
-    branches:
-      - master
-      - develop
-      - stage
-    types:
-      - closed
+    branches: [ main, master, develop, stage ]
+    types: [ closed ]
 
 env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  AWS_REGION: ap-southeast-1
   SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+  ECR_REPOSITORY: lambda-handlers-image
+
+  # GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  build_and_deploy:
-    # if: github.event.pull_request.merged == true
-
+  build-and-test:
+    name: Build & Test
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repo
-        uses: actions/checkout@master
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
-          node-version: '18'
-
-      - name: Cache Dependencies
-        id: cache
-        uses: actions/cache@v2
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Install Dependencies
-        run: npm ci
-
+          node-version: 18
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test --if-present
       - name: Lint
         run: |
           npm run lint \
           && npm run format:check
 
+      - name: Build & Test
+        run: |
+          npm run build \
+          && npm run test --if-present
+
+  build-and-publish:
+    name: Build Lambda-Handlers Docker Image & Publish to AWS ECR
+    if: github.event.pull_request.merged == true
+    needs: build-and-test
+
+    runs-on: ubuntu-latest
+
+    outputs:
+      output1: ${{ steps.step1.outputs.test }}
+      output2: ${{ steps.step2.outputs.test }}
+      registry: ${{ steps.login-ecr.outputs.registry }}
+      image_uri: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:v${{ steps.package-version.outputs.current-version }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: get-npm-version
+        id: package-version
+        uses: martinbeentjes/npm-get-version-action@main
+
       - name: Setup AWS
-        if: github.base_ref == 'develop' || github.base_ref == 'stage' || github.base_ref == 'master'
+        # if: github.base_ref == 'develop' || github.base_ref == 'stage' || github.base_ref == 'master' || github.base_ref == 'main'
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-southeast-1
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        if: github.base_ref == 'develop' || github.base_ref == 'stage' || github.base_ref == 'master'
+        # if: github.base_ref == 'develop' || github.base_ref == 'stage' || github.base_ref == 'master' || github.base_ref == 'main'
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
-      # === [END] predeploy ===
 
-      - name: Build, tag, and push image to Amazon ECR (develop)
-        if: github.base_ref == 'develop'
+      - name: Build, tag, and push image to Amazon ECR
+        if: github.base_ref == 'main'
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: lambda-handlers-image
-          IMAGE_TAG: develop
+          IMAGE_TAG: v${{ steps.package-version.outputs.current-version }}
+          IMAGE_URI: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:v${{ steps.package-version.outputs.current-version }}
+
+  deploy-check-motor-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: check image_uri
+        run: |
+          echo "Using ${{ needs.build-and-publish.outputs.image_uri }}"
+          env
+        env:
+          IMAGE_URI1: ${{ needs.build-and-publish.outputs.image_uri }}
+          IMAGE_URI2: ${{ steps.login-ecr.outputs.registry }}/${ECR_REPOSITORY}:v${{ steps.package-version.outputs.current-version }}
+
+      - name: re-deploy Check Motor Lambda to dev
+        # run: echo call lambda re-deploy check-motor-dev
+        uses: appleboy/lambda-action@master
+        with:
+          function_name: check-motor-badge-dev
+          image_uri: ${{ needs.build-and-publish.outputs.image_uri }}
+          # handler: check-motor-badge.handler
+
+  deploy-check-motor-prod:
+    runs-on: 'ubuntu-latest'
+    environment: 'prod'
+    needs: [build-and-publish, deploy-check-motor-dev]
+    steps:
+      - name: re-deploy Check Motor Lambda
+        run: echo call lambda re-deploy check-motor-prod
+
+  check-motor-dev-running:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: [build-and-publish, deploy-check-motor-dev]
+    steps:
+      - name: Check if Motor Lambda running well on dev
+        run: echo Invoke AWS Lambda check-motor-dev running well
+
+  check-motor-prod-running:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: [build-and-publish, deploy-check-motor-prod]
+    steps:
+      - name: Check if Motor Lambda running well on prod
+        run: echo Invoke AWS Lambda if check-motor-prod running well
+
+  ### Meili Indexer
+  deploy-meili-indexer-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: re-deploy Meili Indexer Lambda to dev
+        # run: echo call lambda re-deploy check-motor-dev
+        uses: appleboy/lambda-action@master
+        with:
+          function_name: refresh-search-index-dev
+          image_uri: ${{ needs.build-and-publish.outputs.image_uri }}
+          # handler: refresh-search-index.handler
+
+  deploy-meili-indexer-prod:
+    runs-on: 'ubuntu-latest'
+    environment: 'prod'
+    needs: [build-and-publish, deploy-meili-indexer-dev]
+    steps:
+      - name: re-deploy Meili Indexer Lambda to prod
+        run: echo call lambda re-deploy meili-indexer-prod
+
+  check-meili-indexer-running:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: [build-and-publish, deploy-meili-indexer-dev]
+    steps:
+      - name: Check if Meili Indexer Lambda running well on dev
+        run: echo Invoke AWS Lambda meili-indexer-dev running well
+
 
