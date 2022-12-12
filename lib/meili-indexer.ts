@@ -17,9 +17,10 @@ export interface Article {
   id: string;
   title: string;
   summary: string;
-  content: string;
+  content?: string;
   textContent?: string;
   textContentConverted?: string;
+  createdAt: string | Date;
   numViews?: string;
 }
 
@@ -37,15 +38,40 @@ export class ArticlesIndexer {
     // this.#converter = new OpenCC("t2s.json");
   }
 
+  async initIndexes() {
+    const res = await Promise.all([
+      this.#meiliClient
+        .index("articles")
+        .updateSortableAttributes(["createdAt", "numViews"]),
+
+      this.#meiliClient
+        .index("articles")
+        .updateRankingRules([
+          "words",
+          "sort",
+          "typo",
+          "proximity",
+          "attribute",
+          "exactness",
+        ]),
+      this.#meiliClient
+        .index("articles")
+        .updateFilterableAttributes(["articleId", "state", "publishState"]),
+    ]);
+
+    console.log("updateFilterableAttributes:", res);
+  }
+
   async addToSearch(articles: Article[]) {
     await Promise.all(
       articles.map(async (arti, idx) => {
-        const $ = cheerio.load(arti.content);
+        const $ = cheerio.load(arti.content!);
         const text = $.text();
         arti.textContent = text;
         arti.textContentConverted = await converter.convertPromise(
           text.toLowerCase()
         );
+        delete arti.content;
         console.log(`article${idx}:`, arti);
       })
     );
