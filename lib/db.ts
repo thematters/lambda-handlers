@@ -4,11 +4,20 @@ import pkg from "../package.json" assert { type: "json" };
 const databaseURL = process.env.PG_CONNECTION_STRING || "";
 export const sql = postgres(databaseURL, {
   // idle_timeout: 300 for 5min, // auto end when idl'ing, use PGIDLE_TIMEOUT
-  // connect_timeout: 130,
-  transform: postgres.toCamel,
+  // connect_timeout: 10,
+  // idle_timeout: 20,
+  // max_lifetime: 60 * 30,
+
+  // transform: postgres.toCamel,
+  transform: {
+    // ...postgres.camel,
+    undefined: null,
+    ...postgres.toCamel,
+  },
+
   // types: { bigint: postgres.BigInt, },
   debug(connection, query, params, types) {
-    console.log(`debug:`, query, { connection, params, types });
+    console.log(`debug: query --:\n${query}\n`, { connection, params, types });
   },
   connection: {
     // TBD change to actual name of each app
@@ -22,28 +31,48 @@ import { Article } from "../lib/meili-indexer.js";
 
 export class DbApi {
   listArticles({
+    articleId,
     take = 5,
     skip = 0,
     batchSize = 5,
-  }: { take?: number; skip?: number; batchSize?: number } = {}) {
+    range = "1 week",
+  }: {
+    articleId?: string;
+    take?: number;
+    skip?: number;
+    batchSize?: number;
+    range?: string;
+  } = {}) {
+    console.log(new Date(), `listArticles:`, {
+      articleId,
+      take,
+      skip,
+      batchSize,
+    });
+    // const singleIdClause = articleId ? sql` (article_id=${articleId}) ` : sql``;
+    const allArticleIds = sql` ( SELECT DISTINCT article_id FROM article_read_count WHERE user_id IS NOT NULL AND age(created_at) <= ${range}::interval ) `;
+    const allRecentArticles = sql` ( SELECT id FROM article WHERE state='active' AND age(created_at) <= ${range}::interval ) `;
+
     return sql<Article[]>`-- check articles from past week
-SELECT draft.id, article_id, draft.title, article.slug, draft.summary, draft.content, draft.created_at, article.state, draft.publish_state, t.*
-FROM draft
-JOIN article ON article_id=article.id
+SELECT *
+FROM (
+  SELECT draft.id, draft.article_id, draft.title, article.slug, draft.summary, draft.content, draft.created_at, article.state, draft.publish_state
+  FROM draft JOIN article ON article_id=article.id AND article_id IS NOT NULL
+  WHERE state='active' AND publish_state='published'
+) d
 LEFT JOIN (
-  SELECT article_id, COUNT(*)::int
+  SELECT article_id, COUNT(*)::int AS num_views
   FROM article_read_count
   WHERE user_id IS NOT NULL
-    AND age(created_at) <= interval '1 week'
   GROUP BY 1
 ) t USING (article_id)
-WHERE state='active'
-  AND publish_state='published'
-  AND age(draft.created_at) <= interval '1 week'
--- ORDER BY RANDOM() LIMIT 3 ;
-ORDER BY draft.created_at DESC
+WHERE article_id IN (
+  ${allArticleIds}
+  UNION ALL
+  ${allRecentArticles}
+)
 LIMIT ${take} OFFSET ${skip}
-`.cursor(batchSize);
+`; // .cursor(batchSize);
   }
 
   listRecentAuthors({
@@ -80,6 +109,11 @@ ORDER BY id DESC
 
   queryArticlesByUuid(uuids: string[]) {
     return sql` SELECT id, title, slug, data_hash, media_hash, created_at FROM article WHERE uuid =ANY(${uuids}) `;
+  }
+
+  async checkVersion() {
+    const [{ version, now }] = await sql` SELECT VERSION(), NOW() `;
+    console.log("pgres:", { version, now });
   }
 }
 
