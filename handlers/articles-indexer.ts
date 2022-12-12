@@ -20,11 +20,21 @@ export const handler = async (
   // const { searchUserKey = "user", searchTagKey = "tag", migrate } = event;
   const { take = 5, skip = 0 } = event;
 
-  // const ends = sql` date_trunc('month', NOW() - interval '1 week') ::date `;
+  let articleId: string | undefined;
+  const http = (event?.requestContext as any)?.http;
+  if (http?.method === "POST") {
+    [, articleId] = http.path.match(/\/p\/(\d+)/);
+    console.log(new Date(), "request update on:", { articleId });
+  }
+
+  await dbApi.checkVersion();
+  // if (Math.random() >= 1e-18) return { statusCode: 200, body: JSON.stringify({ message: "checked.", }), };
 
   const started = Date.now();
   let total = 0;
-  for await (const articles of dbApi.listArticles({ take, skip })) {
+  for await (const articles of dbApi
+    .listArticles({ articleId, take, skip })
+    .cursor(5)) {
     const res = await articlesIndexer.addToSearch(articles);
     console.log(
       new Date(),
