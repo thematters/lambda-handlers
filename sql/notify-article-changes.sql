@@ -1,9 +1,9 @@
 
-CREATE OR REPLACE FUNCTION notify_ipns_changes()
+CREATE OR REPLACE FUNCTION notify_updates()
 RETURNS trigger AS $$
 BEGIN -- BEGIN
   PERFORM pg_notify(
-    COALESCE(TG_ARGV[0], 'ipns_changed'), -- channel default to -- 'ipns_changed',
+    COALESCE(TG_ARGV[0], 'articles_feed'), -- channel default to -- 'articles_feed',
     json_build_object(
       'operation', TG_OP,
       'table_name', TG_TABLE_NAME,
@@ -12,8 +12,8 @@ BEGIN -- BEGIN
       'record', (
         SELECT jsonb_object_agg(key, value) FROM json_each(row_to_json(NEW))
         WHERE key IN (
-          'id', 'slug', 'data_hash', -- article
-          'id', 'ipns_key', 'last_data_hash' -- user_ipns_keys
+          'id', 'article_id', 'title', 'data_hash', 'media_hash', -- article, draft
+          'id', 'user_id', 'ipns_key', 'last_data_hash' -- user_ipns_keys
         )
       )
     )::text
@@ -29,12 +29,18 @@ CREATE TRIGGER ipns_changed
 AFTER UPDATE OF last_data_hash
 ON user_ipns_keys
 FOR EACH ROW
-EXECUTE PROCEDURE notify_ipns_changes('ipns_changed');
+EXECUTE PROCEDURE notify_updates('ipns_changed');
 
-DROP TRIGGER IF EXISTS ipns_changed ON article ;
-CREATE TRIGGER ipns_changed
+DROP TRIGGER IF EXISTS articles_feed ON article ;
+CREATE TRIGGER articles_feed
 AFTER INSERT OR UPDATE
 ON article
 FOR EACH ROW
-EXECUTE PROCEDURE notify_ipns_changes();
+EXECUTE PROCEDURE notify_updates('articles_feed');
 
+DROP TRIGGER IF EXISTS articles_feed ON draft ;
+CREATE TRIGGER articles_feed
+AFTER INSERT OR UPDATE
+ON draft
+FOR EACH ROW
+EXECUTE PROCEDURE notify_updates('articles_feed');
