@@ -51,22 +51,28 @@ const markNewUsers = async () => {
 }
 
 const markActiveUsers = async () => {
-  // active users from old users
+  // active users from exsited users
   await sql`
     INSERT INTO user_retention_history (user_id, state)
+    -- users read 0.1+ hours last 2 mouth
     SELECT user_id, 'ACTIVE'
       FROM article_read_count
       WHERE created_at > (CURRENT_TIMESTAMP - '60 days'::interval )
-      GROUP BY user_id HAVING sum(read_time) >= 360
+      GROUP BY user_id
+      HAVING sum(read_time) >= 360 -- 0.1 hours
+    -- users post 1+ articles last 2 mouth
     UNION SELECT author_id AS user_id, 'ACTIVE'
       FROM article
       WHERE created_at >= (CURRENT_TIMESTAMP - '60 days'::interval)
-      GROUP BY author_id HAVING count(id) >= 1
+      GROUP BY author_id
+      HAVING count(id) >= 1
+    -- except marked users
     EXCEPT SELECT user_id, 'ACTIVE' 
       FROM user_retention_history;`
 
   // active users from NORMAL, INACTIVE pool
   await sql`
+    -- helper table contains: users whose latest retention state are NORMAL / INACTIVE 
     WITH user_retention AS (
       SELECT ranked.user_id, ranked.state, ranked.created_at
       FROM (
@@ -75,7 +81,9 @@ const markActiveUsers = async () => {
       WHERE ranked.rank = 1 AND ranked.state IN ('NORMAL', 'INACTIVE')
     )
     INSERT INTO user_retention_history (user_id, state)
+    -- users whose latest retention state are NORMAL / INACTIVE 
     SELECT user_id, 'ACTIVE' FROM user_retention
+    -- intersect users have enough activies since marked NORMAL / INACTIVE
     INTERSECT (
       SELECT article_read_count.user_id, 'ACTIVE'
         FROM article_read_count,user_retention
@@ -114,4 +122,4 @@ const fetchUsersData = async () => {
 }
 
 
-// processUserRetention({intervalInDays: 0})
+//processUserRetention({intervalInDays: 0})
