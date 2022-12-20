@@ -14,6 +14,11 @@ export class Mail {
   }
 
   send = async (params: MailDataRequired) => {
-    await this.mail.send(params)
+    await this.mail.send({
+      mailSettings: {
+        bypassListManagement: { enable: true },
+      },
+      ...params
+    })
   }
 }
