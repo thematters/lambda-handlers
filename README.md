@@ -6,6 +6,7 @@ feat(lambda): multiple lambda handlers in one repo
 
 - [x] indexer-meilisearch
 - [x] check-motor-badge
+- [x] sendmail
 - [ ] ipns-listener
 
 ## Dependencies
