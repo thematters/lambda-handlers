@@ -156,4 +156,15 @@ jobs:
       - name: Check if Meili Indexer Lambda running well on dev
         run: echo Invoke AWS Lambda meili-indexer-dev running well
 
+  ### User Retention
+  deploy-user-retention-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: re-deploy User Retention Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name user-retention-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+
 
