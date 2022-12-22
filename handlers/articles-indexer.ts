@@ -33,7 +33,11 @@ export const handler = async (
   const started = Date.now();
   let total = 0;
   for await (const articles of dbApi
-    .listArticles({ articleId, take, skip })
+    .listArticles({
+      articleIds: articleId ? [articleId] : undefined,
+      take,
+      skip,
+    })
     .cursor(5)) {
     const res = await articlesIndexer.addToSearch(articles);
     console.log(

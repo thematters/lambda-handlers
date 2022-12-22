@@ -1,5 +1,16 @@
 import postgres from "postgres";
+import knex from "knex";
+import { knexSnakeCaseMappers } from "objection";
 import pkg from "../package.json" assert { type: "json" };
+
+export const pgKnex = knex({
+  client: "pg",
+  connection: process.env.PG_CONNECTION_STRING,
+  pool: { min: 0, max: 2 },
+
+  // searchPath: ["knex", "public"],
+  ...knexSnakeCaseMappers(),
+});
 
 const databaseURL = process.env.PG_CONNECTION_STRING || "";
 export const sql = postgres(databaseURL, {
@@ -31,20 +42,20 @@ import { Article } from "../lib/meili-indexer.js";
 
 export class DbApi {
   listArticles({
-    articleId,
+    articleIds,
     take = 5,
     skip = 0,
     batchSize = 5,
     range = "1 week",
   }: {
-    articleId?: string;
+    articleIds?: string[];
     take?: number;
     skip?: number;
     batchSize?: number;
     range?: string;
   } = {}) {
     console.log(new Date(), `listArticles:`, {
-      articleId,
+      articleIds,
       take,
       skip,
       batchSize,
@@ -59,6 +70,12 @@ FROM (
   SELECT draft.id, draft.article_id, draft.title, article.slug, draft.summary, draft.content, draft.created_at, article.state, draft.publish_state
   FROM draft JOIN article ON article_id=article.id AND article_id IS NOT NULL
   WHERE state='active' AND publish_state='published'
+    AND
+      ${
+        Array.isArray(articleIds)
+          ? sql`article_id IN ${sql(articleIds)}`
+          : sql`article_id IN ( ${allArticleIds} UNION ALL ${allRecentArticles})`
+      }
 ) d
 LEFT JOIN (
   SELECT article_id, COUNT(*)::int AS num_views
@@ -66,11 +83,7 @@ LEFT JOIN (
   WHERE user_id IS NOT NULL
   GROUP BY 1
 ) t USING (article_id)
-WHERE article_id IN (
-  ${allArticleIds}
-  UNION ALL
-  ${allRecentArticles}
-)
+ORDER BY article_id DESC
 LIMIT ${take} OFFSET ${skip}
 `; // .cursor(batchSize);
   }

@@ -1,45 +1,51 @@
 import { sql } from "../lib/db.js";
 
-export const processUserRetention = async ({intervalInDays}: {intervalInDays: number}) => {
-
-  await markNewUsers()
-  await markActiveUsers()
+export const processUserRetention = async ({
+  intervalInDays,
+}: {
+  intervalInDays: number;
+}) => {
+  await markNewUsers();
+  await markActiveUsers();
 
   // fetch needed users data to check and change retention state
-  const users = await fetchUsersData()
+  const users = await fetchUsersData();
 
-  const now = new Date()
-  const intervalInMs = intervalInDays * 86400000
+  const now = new Date();
+  const intervalInMs = intervalInDays * 86400000;
 
-  for (const {userId, state, stateUpdatedAt, lastSeen, email} of users) {
-    const stateDuration = +now - +stateUpdatedAt
+  for (const { userId, state, stateUpdatedAt, lastSeen, email } of users) {
+    const stateDuration = +now - +stateUpdatedAt;
     if (lastSeen > stateUpdatedAt) {
-      console.log('update to NORMAL state')
-      await markUserState(userId, 'NORMAL')
+      console.log("update to NORMAL state");
+      await markUserState(userId, "NORMAL");
     } else if (stateDuration > intervalInMs) {
       //TODO email generators
       switch (state) {
-        case 'NEWUSER':
-          console.log('newuser')
-          await markUserState(userId, 'ALERT')
-          break
-        case 'ACTIVE':
-          console.log('active user')
-          await markUserState(userId, 'ALERT')
-          break
-        case 'ALERT':
-          console.log('alert user')
-          await markUserState(userId, 'INACTIVE')
-          break
+        case "NEWUSER":
+          console.log("newuser");
+          await markUserState(userId, "ALERT");
+          break;
+        case "ACTIVE":
+          console.log("active user");
+          await markUserState(userId, "ALERT");
+          break;
+        case "ALERT":
+          console.log("alert user");
+          await markUserState(userId, "INACTIVE");
+          break;
       }
     }
     // else stateDuration < intervalInMs , do nothing
   }
-}
+};
 
-const markUserState = async (userId: string, state: 'NORMAL' | 'ALERT' | 'INACTIVE' ) => {
-  await sql`INSERT INTO user_retention_history (user_id, state) VALUES (${userId}, ${state});`
-}
+const markUserState = async (
+  userId: string,
+  state: "NORMAL" | "ALERT" | "INACTIVE"
+) => {
+  await sql`INSERT INTO user_retention_history (user_id, state) VALUES (${userId}, ${state});`;
+};
 
 const markNewUsers = async () => {
   await sql`
@@ -47,8 +53,8 @@ const markNewUsers = async () => {
     SELECT id, 'NEWUSER' FROM public.user 
     WHERE 
       created_at >= (CURRENT_TIMESTAMP - '1 day'::interval)
-      AND id NOT IN (SELECT id FROM user_retention_history);`
-}
+      AND id NOT IN (SELECT id FROM user_retention_history);`;
+};
 
 const markActiveUsers = async () => {
   // active users from exsited users
@@ -68,7 +74,7 @@ const markActiveUsers = async () => {
       HAVING count(id) >= 1
     -- except marked users
     EXCEPT SELECT user_id, 'ACTIVE' 
-      FROM user_retention_history;`
+      FROM user_retention_history;`;
 
   // active users from NORMAL, INACTIVE pool
   await sql`
@@ -99,8 +105,8 @@ const markActiveUsers = async () => {
           AND article.created_at >= user_retention.created_at
         GROUP BY article.author_id
         HAVING count(article.id) >= 1
-    );`
-}
+    );`;
+};
 
 const fetchUsersData = async () => {
   return await sql`
@@ -118,8 +124,7 @@ const fetchUsersData = async () => {
       last_seen,
       email 
     FROM user_retention, public.user
-    WHERE user_retention.user_id = public.user.id;`
-}
-
+    WHERE user_retention.user_id = public.user.id;`;
+};
 
 //processUserRetention({intervalInDays: 0})

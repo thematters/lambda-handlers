@@ -10,6 +10,7 @@ async function main() {
   const args = process.argv.slice(2);
   const take = Number.parseInt(args[0], 10) || 5;
   const skip = Number.parseInt(args[1], 10) || 0;
+  const range = args[2] || "1 year";
 
   await articlesIndexer.initIndexes();
   console.log("articlesIndexer.initIndexes");
@@ -19,7 +20,7 @@ async function main() {
     (x) => onNotify(JSON.parse(x)),
     async () =>
       await dbApi
-        .listArticles({ take, skip, range: "1 year" })
+        .listArticles({ take, skip, range })
         .cursor(10, processArticles)
   );
 
@@ -46,7 +47,10 @@ async function onNotify(data: any) {
   switch (data?.table_name) {
     case "draft": {
       const { article_id: articleId } = data.record;
-      const articles = await dbApi.listArticles({ articleId, take: 1 });
+      const articles = await dbApi.listArticles({
+        articleIds: [articleId],
+        take: 1,
+      });
       console.log(
         new Date(),
         `listener got ${articles.length} articles:`,

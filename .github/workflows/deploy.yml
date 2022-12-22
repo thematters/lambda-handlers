@@ -84,15 +84,6 @@ jobs:
     environment: 'dev'
     needs: build-and-publish
     steps:
-      - name: check image_uri
-        run: |
-          echo "Using ${{ needs.build-and-publish.outputs.image_uri }}"
-          env
-        env:
-          IMAGE_URI1: ${{ needs.build-and-publish.outputs.image_uri }}
-          PACKAGE_VERSION: ${{ needs.build-and-publish.outputs.package-version }}
-          IMAGE_URI2: ${{ needs.build-and-publish.outputs.registry }}/${{ env.ECR_REPOSITORY }}:v${{ needs.build-and-publish.outputs.package-version }}
-
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
@@ -135,10 +126,16 @@ jobs:
     environment: 'dev'
     needs: build-and-publish
     steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
       - name: re-deploy Meili Indexer Lambda to dev
         run: |
           aws lambda update-function-code --function-name refresh-search-index-dev \
             --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
 
   deploy-meili-indexer-prod:
     runs-on: 'ubuntu-latest'
@@ -162,9 +159,15 @@ jobs:
     environment: 'dev'
     needs: build-and-publish
     steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
       - name: re-deploy User Retention Lambda to dev
         run: |
           aws lambda update-function-code --function-name user-retention-dev \
             --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
 
 

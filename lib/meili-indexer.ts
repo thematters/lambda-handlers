@@ -54,9 +54,12 @@ export class ArticlesIndexer {
           "attribute",
           "exactness",
         ]),
+
       this.#meiliClient
         .index("articles")
         .updateFilterableAttributes(["articleId", "state", "publishState"]),
+
+      this.#meiliClient.createIndex("articles", { primaryKey: "articleId" }),
     ]);
 
     console.log("updateFilterableAttributes:", res);

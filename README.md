@@ -24,6 +24,10 @@ merge to `main` will trigger build docker image and publish to ECR registry, wit
 
     <account>.dkr.ecr.ap-southeast-1.amazonaws.com/lambda-handlers-image:v0.1.0
 
+Tips: at development phase, can also manually run `docker build -t {above-full-image}:v{date-tag} .`,
+do a login `docker login --username AWS --password-stdin <account>.dkr.ecr.ap-southeast-1.amazonaws.com` first,
+and push it with `docker image push {above-full-image}:v{date-tag}`, test it with manually update lambda function image;
+
 # Create new lambda worker:
 
 1. create handler entry code in `./handlers/<new-lambda>.ts`, export the handler;
