@@ -1,4 +1,5 @@
-import { sql } from "../lib/db.js";
+import { sql } from "../../lib/db.js";
+import { sendmail } from "./sendmail"
 
 export const processUserRetention = async ({
   intervalInDays,
@@ -14,20 +15,21 @@ export const processUserRetention = async ({
   const now = new Date();
   const intervalInMs = intervalInDays * 86400000;
 
-  for (const { userId, state, stateUpdatedAt, lastSeen, email } of users) {
+  const sendmails = []
+
+  for (const { userId, state, stateUpdatedAt, lastSeen } of users) {
     const stateDuration = +now - +stateUpdatedAt;
     if (lastSeen > stateUpdatedAt) {
       console.log("update to NORMAL state");
       await markUserState(userId, "NORMAL");
     } else if (stateDuration > intervalInMs) {
-      //TODO email generators
       switch (state) {
         case "NEWUSER":
-          console.log("newuser");
+          sendmails.push(sendmail(userId, lastSeen, "NEWUSER"))
           await markUserState(userId, "ALERT");
           break;
         case "ACTIVE":
-          console.log("active user");
+          sendmails.push(sendmail(userId, lastSeen, "ACTIVE"))
           await markUserState(userId, "ALERT");
           break;
         case "ALERT":
@@ -38,6 +40,7 @@ export const processUserRetention = async ({
     }
     // else stateDuration < intervalInMs , do nothing
   }
+  await Promise.all(sendmails)
 };
 
 const markUserState = async (
@@ -122,7 +125,6 @@ const fetchUsersData = async () => {
       user_retention.state,
       user_retention.created_at as state_updated_at,
       last_seen,
-      email 
     FROM user_retention, public.user
     WHERE user_retention.user_id = public.user.id;`;
 };

@@ -1,5 +1,5 @@
 import { Mail } from "../lib/mail.js";
-import { processUserRetention } from "../lib/user-retention.js";
+import { processUserRetention } from "../lib/user-retention";
 
 // const sgKey = process.env.SENDGRID_API_KEY || "";
 const intervalInDays =
