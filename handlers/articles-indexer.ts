@@ -11,6 +11,7 @@ export const handler = async (
     take?: number;
     skip?: number;
     migrate?: boolean;
+    range?: string;
   },
   context: Context
 ): Promise<APIGatewayProxyResult> => {
@@ -18,7 +19,7 @@ export const handler = async (
   console.log(`Context: ${JSON.stringify(context, null, 2)}`);
 
   // const { searchUserKey = "user", searchTagKey = "tag", migrate } = event;
-  const { take = 5, skip = 0 } = event;
+  const { take = 5, skip = 0, range = "1 week" } = event;
 
   let articleId: string | undefined;
   const http = (event?.requestContext as any)?.http;
@@ -37,6 +38,7 @@ export const handler = async (
       articleIds: articleId ? [articleId] : undefined,
       take,
       skip,
+      range,
     })
     .cursor(5)) {
     const res = await articlesIndexer.addToSearch(articles);

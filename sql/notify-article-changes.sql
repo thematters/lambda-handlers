@@ -10,13 +10,14 @@ BEGIN -- BEGIN
       -- 'data_hash', row_to_json(NEW) ->'data_hash' -- coalesce(NEW.data_hash, NEW.last_data_hash),
       -- 'ipns_key', coalesce(NEW.ipns_key)
       'record', (
-        SELECT jsonb_object_agg(key, value) FROM json_each(row_to_json(NEW))
+        SELECT jsonb_object_agg(key, value)
+        FROM json_each(row_to_json(NEW))
         WHERE key IN (
-          'id', 'article_id', 'title', 'data_hash', 'media_hash', -- article, draft
+          'id', 'article_id', 'draft_id', 'title', 'data_hash', 'media_hash', -- article, draft
           'id', 'user_id', 'ipns_key', 'last_data_hash' -- user_ipns_keys
         )
       )
-    )::text
+    ) ::text
   );
 
   RETURN NEW;
@@ -38,9 +39,3 @@ ON article
 FOR EACH ROW
 EXECUTE PROCEDURE notify_updates('articles_feed');
 
-DROP TRIGGER IF EXISTS articles_feed ON draft ;
-CREATE TRIGGER articles_feed
-AFTER INSERT OR UPDATE
-ON draft
-FOR EACH ROW
-EXECUTE PROCEDURE notify_updates('articles_feed');

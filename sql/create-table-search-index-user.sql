@@ -5,16 +5,16 @@ DROP TABLE IF EXISTS search_index.user ;
 CREATE TABLE IF NOT EXISTS search_index.user AS
   SELECT id, user_name, lower(trim(leading '@＠ ' from display_name)) AS display_name,
     display_name AS display_name_orig,
-    description, num_followers
+    description, num_followers, last_followed_at
   FROM public.user u
   LEFT JOIN (
     SELECT target_id, COUNT(*) ::int AS num_followers,
-      MAX(created_at) AS latest_followed_at
+      MAX(created_at) AS last_followed_at
     FROM action_user
     GROUP BY 1
   ) t ON target_id=u.id
   WHERE state IN ('active', 'onboarding')
-  ORDER BY latest_followed_at DESC NULLS LAST, u.id DESC
+  ORDER BY last_followed_at DESC NULLS LAST, u.id DESC
   LIMIT 10000
 ;
 

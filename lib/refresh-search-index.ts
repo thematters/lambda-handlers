@@ -1,7 +1,10 @@
-import { sql } from "../lib/db.js";
+import { dbApi, sql } from "../lib/db.js";
 // import { PostgresError } from "postgres";
 import postgres from "postgres";
-import { pgKnex } from "../lib/db.js";
+// import { pgKnex } from "../lib/db.js";
+import createDebug from "debug";
+
+const debugLog = createDebug("search-index-user-tag");
 
 // import OpenCC from "opencc";
 import * as opencc from "opencc";
@@ -60,18 +63,17 @@ export async function refreshSearchIndexUser({
       {
         const started = Date.now();
 
-        const allUsers = sql`-- refresh table as view
+        /* const allUsers = sql`-- refresh table as view
 -- REFRESH MATERIALIZED VIEW CONCURRENTLY search_index.user ;
 
 SELECT id, user_name, display_name,
-  display_name AS display_name_orig,
+  -- display_name AS display_name_orig,
   description, num_followers
 FROM public.user u
 LEFT JOIN (
   SELECT target_id, COUNT(*) ::int AS num_followers,
     MAX(created_at) AS latest_followed_at
   FROM action_user
-  -- WHERE age(created_at) <= $ {range}::interval
   GROUP BY 1
 ) t ON target_id=u.id
 WHERE state IN ('active', 'onboarding')
@@ -79,32 +81,62 @@ WHERE state IN ('active', 'onboarding')
 
 ORDER BY latest_followed_at DESC NULLS LAST, u.updated_at DESC
 LIMIT ${checkLastBatchSize} OFFSET ${checkLastBatchOffset}
-`;
-        for await (const rows of allUsers.cursor(10)) {
+`; */
+        for await (const rows of dbApi
+          .listRecentUsers({
+            take: checkLastBatchSize,
+            skip: checkLastBatchOffset,
+            range,
+          })
+          .cursor(100)) {
           await Promise.all(
             rows.map(async (row) => {
               // row.userName = row.userName.toLowerCase();
-              if (row.displayName)
+              if (row.displayName) {
+                row.displayNameOrig = row.displayName;
                 row.displayName = await converter.convertPromise(
                   row.displayName.toLowerCase()
                 );
+              }
             })
           );
 
           console.log(new Date(), `prepared ${rows.length} items:`, rows);
-          const res = await pgKnex.raw(
+          const res = await /* pgKnex.raw(
             `-- insert new users, or update
 ? ON CONFLICT (id) DO UPDATE SET user_name = EXCLUDED.user_name, display_name = EXCLUDED.display_name, num_followers = EXCLUDED.num_followers, indexed_at = CURRENT_TIMESTAMP
 RETURNING * ;`,
             [pgKnex("search_index.user").insert(rows)]
-          );
+          ); */
 
-          // INSERT INTO search_index.user ${sql(rows)}
-          // -- ON CONFLICT (id) DO UPDATE SET user_name = EXCLUDED.user_name, display_name = EXCLUDED.display_name, num_followers = EXCLUDED.num_followers, indexed_at = NOW()
-          console.log(
+          sql`-- upsert new users
+INSERT INTO search_index.user(id, user_name, display_name, display_name_orig, description, num_followers, last_followed_at) -- $ {sql(rows)}
+  SELECT * FROM UNNEST(
+    ${sql.array(rows.map(({ id }) => id))} ::int[],
+    ${sql.array(rows.map(({ userName }) => userName))} ::text[],
+    ${sql.array(rows.map(({ displayName }) => displayName))} ::text[],
+    ${sql.array(rows.map(({ displayNameOrig }) => displayNameOrig))} ::text[],
+    ${sql.array(rows.map(({ description }) => description))} ::text[],
+    ${sql.array(rows.map(({ numFollowers }) => numFollowers))} ::int[],
+    ${sql.array(
+      rows.map(({ lastFollowedAt }) => lastFollowedAt?.toISOString())
+    )} ::timestamptz[]
+  ) -- AS x(id, user_name, display_name, display_name_orig, description, num_followers, last_followed_at)
+ON CONFLICT (id)
+DO UPDATE
+  SET user_name = EXCLUDED.user_name
+    , display_name = EXCLUDED.display_name
+    , display_name_orig = EXCLUDED.display_name_orig
+    , description = EXCLUDED.description
+    , num_followers = EXCLUDED.num_followers
+    , last_followed_at = EXCLUDED.last_followed_at
+    , indexed_at = CURRENT_TIMESTAMP
+
+RETURNING * ;`;
+          debugLog(
             new Date(),
-            `inserted (or updated) ${res.rowCount} items:`,
-            res.rows
+            `inserted (or updated) ${res.length} items:`,
+            res.map(({ id, userName }) => `/@${userName}-${id}`) // .rows
           );
         }
         const ended = new Date();
@@ -176,38 +208,43 @@ export async function refreshSearchIndexTag({
     try {
       {
         const started = Date.now();
-        const allTags = sql`-- refresh table as view
+        /* const allTags = sql`-- refresh table as view
 -- REFRESH MATERIALIZED VIEW CONCURRENTLY search_index.tag ;
 
-SELECT id, content, content AS content_orig, -- to be filled later with opencc conversion
+SELECT id, content, -- content AS content_orig, -- to be filled later with opencc conversion
   description, num_articles, num_authors, num_followers
 FROM public.tag
 LEFT JOIN (
   SELECT target_id, COUNT(*) ::int AS num_followers,
     MAX(created_at) AS latest_followed_at
   FROM action_tag
-  -- WHERE age(created_at) <= $ {range}::interval
   GROUP BY 1
 ) actions ON target_id=tag.id
 LEFT JOIN (
   SELECT tag_id, COUNT(*)::int AS num_articles, COUNT(DISTINCT author_id) ::int AS num_authors
   FROM article_tag JOIN article ON article_id=article.id
-  -- WHERE age(created_at) <= $ {range}::interval
   GROUP BY 1
 ) at ON tag_id=tag.id
 
 -- remove known duplicates from 'mat_views.tags_lasts'
 WHERE
   tag.id NOT IN ( SELECT UNNEST( array_remove(dup_tag_ids, id) ) FROM mat_views.tags_lasts WHERE ARRAY_LENGTH(dup_tag_ids,1)>1 )
-  AND ( tag.id IN ( SELECT DISTINCT tag_id FROM article_tag WHERE age(created_at) <= $ {range}::interval )
-     OR tag.id IN ( SELECT DISTINCT target_id FROM action_tag WHERE age(created_at) <= $ {range}::interval ) )
+  AND ( tag.id IN ( SELECT DISTINCT tag_id FROM article_tag WHERE age(created_at) <= ${range} ::interval )
+     OR tag.id IN ( SELECT DISTINCT target_id FROM action_tag WHERE age(created_at) <= ${range} ::interval ) )
 
 ORDER BY latest_followed_at DESC NULLS LAST, tag.updated_at DESC
 LIMIT ${checkLastBatchSize} OFFSET ${checkLastBatchOffset}
-; `;
-        for await (const rows of allTags.cursor(10)) {
+; `; */
+        for await (const rows of dbApi
+          .listRecentTags({
+            take: checkLastBatchSize,
+            skip: checkLastBatchOffset,
+            range,
+          })
+          .cursor(100)) {
           await Promise.all(
             rows.map(async (row) => {
+              row.contentOrig = row.content;
               row.content = await converter.convertPromise(
                 row.content.toLowerCase()
               );
@@ -221,14 +258,42 @@ DO UPDATE SET
   num_followers = EXCLUDED.num_followers,
   indexed_at = NOW()
 RETURNING * ;`; */
-          const res = await pgKnex.raw(
+          const res = await /* pgKnex.raw(
             `? ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content, num_followers = EXCLUDED.num_followers, indexed_at = CURRENT_TIMESTAMP RETURNING * ;`,
             [pgKnex("search_index.tag").insert(rows)]
-          );
-          console.log(
+          ); */
+          sql`-- insert new tags, or update
+INSERT INTO search_index.tag(id, content, content_orig, description, num_articles, num_authors, num_followers, last_followed_at)
+  SELECT * FROM UNNEST(
+    ${sql.array(rows.map(({ id }) => id))} ::int[],
+    ${sql.array(rows.map(({ content }) => content))} ::text[],
+    ${sql.array(rows.map(({ contentOrig }) => contentOrig))} ::text[],
+    ${sql.array(rows.map(({ description }) => description))} ::text[],
+    ${sql.array(rows.map(({ numArticles }) => numArticles))} ::int[],
+    ${sql.array(rows.map(({ numAuthors }) => numAuthors))} ::int[],
+    ${sql.array(rows.map(({ numFollowers }) => numFollowers))} ::int[],
+    ${sql.array(
+      rows.map(({ lastFollowedAt }) => lastFollowedAt?.toISOString())
+    )} ::timestamptz[]
+  ) -- AS x(id, content, content_orig, description, num_articles, num_authors, num_followers)
+ON CONFLICT (id)
+DO UPDATE SET
+  content = EXCLUDED.content,
+  content_orig = EXCLUDED.content_orig,
+  description = EXCLUDED.description,
+  num_articles = EXCLUDED.num_articles,
+  num_authors = EXCLUDED.num_authors,
+  num_followers = EXCLUDED.num_followers,
+  last_followed_at = EXCLUDED.last_followed_at,
+  indexed_at = CURRENT_TIMESTAMP
+
+RETURNING * ; `;
+
+          debugLog(
             new Date(),
-            `inserted (or updated) ${res.rowCount} items:`,
-            res.rows
+            `inserted (or updated) ${res.length} items:`,
+            // res // .rows
+            res.map(({ id, contentOrig }) => `/${id}-${contentOrig}`) // .rows
           );
         }
 

@@ -1,7 +1,9 @@
+# the typescript builder
 FROM public.ecr.aws/lambda/nodejs:18 as builder
 RUN yum update -y && \
     yum groupinstall "Development Tools" -y && \
     yum install python3 -y
+# RUN npm install -g @mapbox/node-pre-gyp
 
 WORKDIR /usr/app
 COPY package*.json ./
@@ -12,10 +14,12 @@ COPY ./handlers ./handlers
 COPY ./tsconfig.json ./*.ts ./
 RUN npm run build
 
+# runtime node_modules binary dependecies builder
 FROM public.ecr.aws/lambda/nodejs:18 as runtime
 RUN yum update -y && \
     yum groupinstall "Development Tools" -y && \
     yum install python3 -y
+# RUN npm install -g @mapbox/node-pre-gyp
 
 WORKDIR /usr/app
 COPY package*.json ./

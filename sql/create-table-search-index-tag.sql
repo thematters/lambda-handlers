@@ -4,23 +4,31 @@ DROP TABLE IF EXISTS search_index.tag ;
 
 CREATE TABLE IF NOT EXISTS search_index.tag AS
   SELECT id, lower(trim(both '#＃ ' from content)) AS content, content AS content_orig, -- to be filled later with opencc conversion
-    description, num_articles, num_authors, num_followers -- , NOW() AS indexed_at
+    description, num_articles, num_authors, num_followers, last_followed_at
   FROM public.tag
   LEFT JOIN (
     SELECT target_id, COUNT(*) ::int AS num_followers,
-      MAX(created_at) AS latest_followed_at
+      MAX(created_at) AS last_followed_at
     FROM action_tag
     GROUP BY 1
   ) actions ON target_id=tag.id
   LEFT JOIN (
-    SELECT tag_id, COUNT(*)::int AS num_articles, COUNT(DISTINCT author_id) ::int AS num_authors
-    FROM article_tag JOIN article ON article_id=article.id
+    SELECT tag_id, COUNT(*) ::int AS num_articles, COUNT(DISTINCT author_id) ::int AS num_authors
+    FROM article_tag JOIN article ON article_id=article.id AND article.state IN ('active')
     GROUP BY 1
   ) at ON tag_id=tag.id
 
-  WHERE tag.id NOT IN ( SELECT UNNEST( array_remove(dup_tag_ids, id) ) FROM mat_views.tags_lasts WHERE ARRAY_LENGTH(dup_tag_ids,1)>1 )
-  ORDER BY latest_followed_at DESC NULLS LAST, tag.id DESC
-  LIMIT 10000
+  -- remove known duplicates from 'mat_views.tags_lasts'
+  WHERE
+    tag.id NOT IN ( SELECT UNNEST( array_remove(dup_tag_ids, id) ) FROM mat_views.tags_lasts WHERE ARRAY_LENGTH(dup_tag_ids,1)>1 )
+    AND tag.id IN ( SELECT tag_id FROM article_tag WHERE age(created_at) <= '1 year' ::interval
+          UNION ALL SELECT target_id FROM action_tag WHERE age(created_at) <= '1 year' ::interval )
+
+  ORDER BY last_followed_at DESC NULLS LAST,
+    -- tag.updated_at DESC,
+    tag.id DESC
+
+  LIMIT 10000 -- to avoid initialization time too long on Prod
 ;
 
 ALTER TABLE search_index.tag ADD PRIMARY KEY (id) ;

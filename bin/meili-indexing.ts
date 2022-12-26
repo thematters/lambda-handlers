@@ -6,11 +6,13 @@
 import { dbApi, sql } from "../lib/db.js";
 import { articlesIndexer, Article } from "../lib/meili-indexer.js";
 
+const BATCH_SIZE = Number.parseInt(process.env.BATCH_SIZE || "", 10) || 100;
+
 async function main() {
   const args = process.argv.slice(2);
-  const take = Number.parseInt(args[0], 10) || 5;
-  const skip = Number.parseInt(args[1], 10) || 0;
-  const range = args[2] || "1 year";
+  const take = Number.parseInt(args[0] ?? 5, 10);
+  const skip = Number.parseInt(args[1] ?? 0, 10);
+  const range = args[2] ?? "1 year";
 
   await articlesIndexer.initIndexes();
   console.log("articlesIndexer.initIndexes");
@@ -20,8 +22,8 @@ async function main() {
     (x) => onNotify(JSON.parse(x)),
     async () =>
       await dbApi
-        .listArticles({ take, skip, range })
-        .cursor(10, processArticles)
+        .listArticles({ take, skip, range, orderBy: "seqDesc" })
+        .cursor(BATCH_SIZE, processArticles)
   );
 
   /*
@@ -45,10 +47,20 @@ async function onNotify(data: any) {
   console.log(new Date(), "updateOneArticle:", data);
 
   switch (data?.table_name) {
+    case "article":
     case "draft": {
-      const { article_id: articleId } = data.record;
+      const {
+        id,
+        article_id: articleId,
+        draft_id: draftId,
+        data_hash: dataHash,
+        media_hash: mediaHash,
+      } = data.record;
+      if (!(articleId || draftId)) return; // neither article nor draft
+      if (!(dataHash || mediaHash)) return; // no dataHash yet
+
       const articles = await dbApi.listArticles({
-        articleIds: [articleId],
+        articleIds: [articleId ?? id],
         take: 1,
       });
       console.log(
@@ -59,13 +71,17 @@ async function onNotify(data: any) {
       processArticles(articles);
       break;
     }
-    case "article":
   }
 }
 
 async function processArticles(articles: Article[]) {
   const res = await articlesIndexer.addToSearch(articles);
-  console.log(new Date(), `added ${articles.length} articles to search:`, res);
+  console.log(
+    new Date(),
+    `added ${articles.length} articles to search:`,
+    articles.map(({ articleId, slug }) => `${articleId}-${slug}`),
+    res
+  );
 }
 
 main().catch((err) => console.error(new Date(), "ERROR:", err));
