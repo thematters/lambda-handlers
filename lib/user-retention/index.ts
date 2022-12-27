@@ -1,5 +1,5 @@
 import { sql } from "../../lib/db.js";
-import { sendmail } from "./sendmail"
+import { sendmail } from "./sendmail";
 
 export const processUserRetention = async ({
   intervalInDays,
@@ -15,7 +15,7 @@ export const processUserRetention = async ({
   const now = new Date();
   const intervalInMs = intervalInDays * 86400000;
 
-  const sendmails = []
+  const sendmails = [];
 
   for (const { userId, state, stateUpdatedAt, lastSeen } of users) {
     const stateDuration = +now - +stateUpdatedAt;
@@ -25,11 +25,11 @@ export const processUserRetention = async ({
     } else if (stateDuration > intervalInMs) {
       switch (state) {
         case "NEWUSER":
-          sendmails.push(sendmail(userId, lastSeen, "NEWUSER"))
+          sendmails.push(sendmail(userId, lastSeen, "NEWUSER"));
           await markUserState(userId, "ALERT");
           break;
         case "ACTIVE":
-          sendmails.push(sendmail(userId, lastSeen, "ACTIVE"))
+          sendmails.push(sendmail(userId, lastSeen, "ACTIVE"));
           await markUserState(userId, "ALERT");
           break;
         case "ALERT":
@@ -40,7 +40,7 @@ export const processUserRetention = async ({
     }
     // else stateDuration < intervalInMs , do nothing
   }
-  await Promise.all(sendmails)
+  await Promise.all(sendmails);
 };
 
 const markUserState = async (
