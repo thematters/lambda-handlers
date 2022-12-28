@@ -4,6 +4,7 @@ import { Mail } from "../../lib/mail.js";
 const sgKey = process.env.SENDGRID_API_KEY || "";
 const siteDomain = process.env.MATTERS_SITE_DOMAIN || "";
 const newFeatureTagId = process.env.MATTERS_NEW_FEATURE_TAG_ID || "";
+const isProd = siteDomain === "https://matters.news";
 
 const mail = new Mail(sgKey);
 
@@ -37,7 +38,7 @@ export const sendmail = async (
       : [];
   await mail.send({
     from: "Matters<ask@matters.news>",
-    templateId: "d-22b0f1c254d74cadaf6b2d246e0b4c14",
+    templateId: getTemplateId(language),
     personalizations: [
       {
         to: email,
@@ -213,6 +214,21 @@ const getSubject = (
   return copys[language];
 };
 
+const getTemplateId = (language: Language): string => {
+  const templateIdsDev = {
+    zh_hant: "d-550c209eef09442d8430fed10379593a",
+    zh_hans: "d-22b0f1c254d74cadaf6b2d246e0b4c14",
+    en: "d-550c209eef09442d8430fed10379593a",
+  };
+  const templateIdsProd = {
+    zh_hant: "d-bc5695dcae564795ac76bc6a783a5ef7",
+    zh_hans: "d-7497ca1cfaa745a8bff4b3d20e92480a",
+    en: "d-bc5695dcae564795ac76bc6a783a5ef7",
+  };
+  const templateIds = isProd ? templateIdsProd : templateIdsDev;
+  return templateIds[language];
+};
+
 const loadDoneeHotArticles = async (
   userId: string,
   lastSeen: Date,
@@ -308,4 +324,6 @@ const getDays = (past: Date) => {
 
 // const mediaHashToLink = (siteDomain: string, mediaHash: string) => `https://${siteDomain}/@-/-${mediaHash}`
 
-// sendmail('3685', new Date('2022-10-18'), 'NEWUSER').then(()=>{process.exit()})
+sendmail("3685", new Date("2022-10-18"), "NEWUSER", async () => {
+  process.exit();
+});
