@@ -1,5 +1,5 @@
 import { sql } from "../../lib/db.js";
-import { sendmail } from "./sendmail";
+import { sendmail } from "./sendmail.js";
 
 export const processUserRetention = async ({
   intervalInDays,
@@ -20,20 +20,24 @@ export const processUserRetention = async ({
   for (const { userId, state, stateUpdatedAt, lastSeen } of users) {
     const stateDuration = +now - +stateUpdatedAt;
     if (lastSeen > stateUpdatedAt) {
-      console.log("update to NORMAL state");
       await markUserState(userId, "NORMAL");
     } else if (stateDuration > intervalInMs) {
       switch (state) {
         case "NEWUSER":
-          sendmails.push(sendmail(userId, lastSeen, "NEWUSER"));
-          await markUserState(userId, "ALERT");
+          sendmails.push(
+            sendmail(userId, lastSeen, "NEWUSER", async () =>
+              markUserState(userId, "ALERT")
+            )
+          );
           break;
         case "ACTIVE":
-          sendmails.push(sendmail(userId, lastSeen, "ACTIVE"));
-          await markUserState(userId, "ALERT");
+          sendmails.push(
+            sendmail(userId, lastSeen, "ACTIVE", async () =>
+              markUserState(userId, "ALERT")
+            )
+          );
           break;
         case "ALERT":
-          console.log("alert user");
           await markUserState(userId, "INACTIVE");
           break;
       }
@@ -124,9 +128,9 @@ const fetchUsersData = async () => {
       user_id,
       user_retention.state,
       user_retention.created_at as state_updated_at,
-      last_seen,
+      last_seen
     FROM user_retention, public.user
     WHERE user_retention.user_id = public.user.id;`;
 };
 
-//processUserRetention({intervalInDays: 0})
+//processUserRetention({intervalInDays: 0}).then(()=>{process.exit()})

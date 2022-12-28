@@ -10,7 +10,8 @@ const mail = new Mail(sgKey);
 export const sendmail = async (
   userId: string,
   lastSeen: Date,
-  type: "NEWUSER" | "ACTIVE"
+  type: "NEWUSER" | "ACTIVE",
+  callback: () => Promise<void>
 ) => {
   const { displayName, email, language, createdAt } = await loadUserInfo(
     userId
@@ -56,6 +57,7 @@ export const sendmail = async (
       },
     ],
   });
+  await callback();
 };
 
 // helpers
