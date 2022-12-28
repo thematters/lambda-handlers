@@ -16,52 +16,46 @@ export const sendmail = async (
     userId
   );
   const subject = getSubject(displayName, type, language);
-  const recipient = { displayName, createdAt };
+  const recipient = { displayName, days: getDays(createdAt) };
   const [
     articlesRecommended,
-    articlesHottest,
     numDonations,
     numAppreciations,
     usersRecommended,
     articlesNewFeature,
   ] = await Promise.all([
     loadRecommendedArticles(userId, lastSeen, 3),
-    loadHottestArticles(userId, 3),
     loadNumDonations(userId),
     loadNumAppreciations(userId),
     loadRecommendedUsers(userId, 3),
     loadNewFeatureArticles(newFeatureTagId, 1),
   ]);
-  console.log({
-    articlesRecommended,
-    articlesHottest,
-    numDonations,
-    numAppreciations,
-    usersRecommended,
-    articlesNewFeature,
+  const articlesHottest =
+    articlesRecommended.length === 0
+      ? await loadHottestArticles(userId, 3)
+      : [];
+  await mail.send({
+    from: "Matters<ask@matters.news>",
+    templateId: "d-22b0f1c254d74cadaf6b2d246e0b4c14",
+    personalizations: [
+      {
+        to: email,
+        // @ts-ignore
+        dynamic_template_data: {
+          subject,
+          siteDomain,
+          recipient,
+          type,
+          articlesRecommended,
+          articlesHottest,
+          numDonations,
+          numAppreciations,
+          usersRecommended,
+          articlesNewFeature,
+        },
+      },
+    ],
   });
-  // mail.send({
-  //  from: 'Matters<ask@matters.news>',
-  //  templateId,
-  //  personalizations: [
-  //    {
-  //      to: email,
-  //      dynamic_template_data: {
-  //        subject,
-  //        siteDomain,
-  //        recipient,
-  //        type,
-  //        articlesRecommended,
-  //        articlesHottest,
-  //        numDonations
-  //        numAppreciations
-  //        usersRecommended
-  //        articlesNewFeature
-  //        }),
-  //      },
-  //    },
-  //  ],
-  //})
 };
 
 // helpers
@@ -303,6 +297,12 @@ const loadArticles = async (
       article_comment.num_comments DESC NULLS LAST
     LIMIT ${limit};
     `;
+
+const getDays = (past: Date) => {
+  const oneDay = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  return Math.round(Math.abs((+now - +past) / oneDay));
+};
 
 // const mediaHashToLink = (siteDomain: string, mediaHash: string) => `https://${siteDomain}/@-/-${mediaHash}`
 
