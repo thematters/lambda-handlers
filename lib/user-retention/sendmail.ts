@@ -324,6 +324,6 @@ const getDays = (past: Date) => {
 
 // const mediaHashToLink = (siteDomain: string, mediaHash: string) => `https://${siteDomain}/@-/-${mediaHash}`
 
-sendmail("3685", new Date("2022-10-18"), "NEWUSER", async () => {
-  process.exit();
-});
+//sendmail("3685", new Date("2022-10-18"), "NEWUSER", async () => {
+//  process.exit();
+//});
