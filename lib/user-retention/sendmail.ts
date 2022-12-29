@@ -42,8 +42,7 @@ export const sendmail = async (
     personalizations: [
       {
         to: email,
-        // @ts-ignore
-        dynamic_template_data: {
+        dynamicTemplateData: {
           subject,
           siteDomain,
           recipient,

@@ -14,8 +14,6 @@ export class Mail {
   };
 
   send = async (params: MailDataRequired) => {
-    // @ts-ignore
-    console.log(params.personalizations[0].dynamic_template_data)
     await this.mail.send({
       mailSettings: {
         bypassListManagement: { enable: true },
