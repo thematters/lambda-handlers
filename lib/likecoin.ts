@@ -1,4 +1,6 @@
+import axios, { AxiosRequestConfig, AxiosHeaders } from "axios";
 import { Knex } from "knex";
+import _ from "lodash";
 
 import { pgKnex } from "./db.js";
 
@@ -11,6 +13,15 @@ const likecoinClientSecret = process.env.MATTERS_LIKECOIN_CLIENT_SECRET || "";
 // TYPE
 
 type UserOAuthLikeCoinAccountType = "temporal" | "general";
+
+type RequestProps = {
+  endpoint: string;
+  headers?: { [key: string]: any };
+  liker?: UserOAuthLikeCoin;
+  withClientCredential?: boolean;
+  ip?: string;
+  userAgent?: string;
+} & AxiosRequestConfig;
 
 interface UserOAuthLikeCoin {
   likerId: string;
@@ -56,7 +67,7 @@ const ERROR_CODE = {
   INSUFFICIENT_PERMISSION: "INSUFFICIENT_PERMISSION",
 };
 
-class LikeCoin {
+export class LikeCoin {
   knex: Knex;
   constructor() {
     this.knex = pgKnex;
@@ -78,10 +89,13 @@ class LikeCoin {
 
   sendPV = async (data: SendPVData) => {
     const { likerId } = data;
-    const liker = await this.findLiker({ likerId });
+    const liker =
+      likerId === undefined
+        ? undefined
+        : (await this.findLiker({ likerId })) || undefined;
 
     const result = await this.requestCount({
-      liker: liker || undefined,
+      liker: liker,
       ...data,
     });
   };
@@ -101,7 +115,7 @@ class LikeCoin {
     amount: number;
     userAgent: string;
   }) => {
-    const endpoint = `${ENDPOINTS.like}/${authorLikerId}/${amount}`;
+    const endpoint = `${ENDPOINT.like}/${authorLikerId}/${amount}`;
     const result = await this.request({
       ip: likerIp,
       userAgent,
@@ -171,22 +185,13 @@ class LikeCoin {
     const makeRequest = () => {
       // Headers
       if (accessToken) {
-        headers = {
-          ...headers,
-          Authorization: `Bearer ${accessToken}`,
-        };
+        (headers as AxiosHeaders).set("Authorization", `Bearer ${accessToken}`);
       }
       if (ip) {
-        headers = {
-          ...headers,
-          "X-LIKECOIN-REAL-IP": ip,
-        };
+        (headers as AxiosHeaders).set("X-LIKECOIN-REAL-IP", ip);
       }
       if (userAgent) {
-        headers = {
-          ...headers,
-          "X-LIKECOIN-USER-AGENT": userAgent,
-        };
+        (headers as AxiosHeaders).set("X-LIKECOIN-USER-AGENT", userAgent);
       }
 
       // Params
@@ -222,7 +227,7 @@ class LikeCoin {
       try {
         return await makeRequest();
       } catch (e) {
-        const err = _.get(e, "response.data");
+        const err = _.get(e, "response.data") as any;
 
         switch (err) {
           case ERROR_CODE.TOKEN_EXPIRED:
@@ -234,14 +239,14 @@ class LikeCoin {
             break;
 
           case ERROR_CODE.EMAIL_ALREADY_USED:
-            throw new LikerEmailExistsError("email already used.");
+            throw new Error("email already used.");
           case ERROR_CODE.OAUTH_USER_ID_ALREADY_USED:
-            throw new LikerUserIdExistsError("user id already used.");
+            throw new Error("user id already used.");
 
           // notify client to prompt the user for reauthentication.
           // case ERROR_CODE.LOGIN_NEEDED: // was not re-trying
           case ERROR_CODE.INSUFFICIENT_PERMISSION:
-            throw new OAuthTokenInvalidError(
+            throw new Error(
               "token has no permission to access the resource, please reauth."
             );
         }
@@ -290,9 +295,5 @@ class LikeCoin {
   }: {
     likerId: string;
   }): Promise<UserOAuthLikeCoin | null> =>
-    this.knex
-      .select()
-      .from("user_oauth_likecoin")
-      .where({ likerId: userLikerId })
-      .first();
+    this.knex.select().from("user_oauth_likecoin").where({ likerId }).first();
 }
