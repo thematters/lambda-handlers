@@ -9,6 +9,7 @@ feat(lambda): multiple lambda handlers in one repo
 - [x] sendmail
 - [ ] ipns-listener
 - [ ] user-retention
+- [ ] likecoin-like
 
 ## Dependencies
 
