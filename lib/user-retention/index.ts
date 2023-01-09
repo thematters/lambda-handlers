@@ -6,17 +6,24 @@ export const processUserRetention = async ({
 }: {
   intervalInDays: number;
 }) => {
+  console.time('markNewUsers')
   await markNewUsers();
+  console.timeEnd('markNewUsers')
+  console.time('markActiveUsers')
   await markActiveUsers();
+  console.timeEnd('markActiveUsers')
 
   // fetch needed users data to check and change retention state
+  console.time('fetchUsersData')
   const users = await fetchUsersData();
+  console.timeEnd('fetchUsersData')
 
   const now = new Date();
   const intervalInMs = intervalInDays * 86400000;
 
   const sendmails = [];
 
+  console.time('loop')
   for (const { userId, state, stateUpdatedAt, lastSeen } of users) {
     const stateDuration = +now - +stateUpdatedAt;
     if (lastSeen > stateUpdatedAt) {
@@ -44,7 +51,11 @@ export const processUserRetention = async ({
     }
     // else stateDuration < intervalInMs , do nothing
   }
+  console.timeEnd('loop')
+
+  console.time('sendmails')
   await Promise.all(sendmails);
+  console.timeEnd('sendmails')
 };
 
 const markUserState = async (
