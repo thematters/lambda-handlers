@@ -1,5 +1,5 @@
 import { Mail } from "../lib/mail.js";
-import { processUserRetention } from "../lib/user-retention";
+import { processUserRetention } from "../lib/user-retention/index.js";
 
 // envs need to provide:
 // PG_CONNECTION_STRING
