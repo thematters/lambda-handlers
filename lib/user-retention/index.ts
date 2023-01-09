@@ -3,28 +3,32 @@ import { sendmail } from "./sendmail.js";
 
 export const processUserRetention = async ({
   intervalInDays,
+  limit,
 }: {
   intervalInDays: number;
+  limit?: number;
 }) => {
-  console.time('markNewUsers')
+  console.time("markNewUsers");
   await markNewUsers();
-  console.timeEnd('markNewUsers')
-  console.time('markActiveUsers')
+  console.timeEnd("markNewUsers");
+  console.time("markActiveUsers");
   await markActiveUsers();
-  console.timeEnd('markActiveUsers')
+  console.timeEnd("markActiveUsers");
 
   // fetch needed users data to check and change retention state
-  console.time('fetchUsersData')
+  console.time("fetchUsersData");
   const users = await fetchUsersData();
-  console.timeEnd('fetchUsersData')
+  console.timeEnd("fetchUsersData");
+  console.log(`users num: ${users.length}`);
 
   const now = new Date();
   const intervalInMs = intervalInDays * 86400000;
 
   const sendmails = [];
 
-  console.time('loop')
-  for (const { userId, state, stateUpdatedAt, lastSeen } of users) {
+  console.time("loop");
+  const target = limit === undefined ? users : users.slice(0, limit);
+  for (const { userId, state, stateUpdatedAt, lastSeen } of target) {
     const stateDuration = +now - +stateUpdatedAt;
     if (lastSeen > stateUpdatedAt) {
       await markUserState(userId, "NORMAL");
@@ -51,11 +55,12 @@ export const processUserRetention = async ({
     }
     // else stateDuration < intervalInMs , do nothing
   }
-  console.timeEnd('loop')
+  console.timeEnd("loop");
 
-  console.time('sendmails')
+  console.log(`sendmails num: ${sendmails.length}`);
+  console.time("sendmails");
   await Promise.all(sendmails);
-  console.timeEnd('sendmails')
+  console.timeEnd("sendmails");
 };
 
 const markUserState = async (

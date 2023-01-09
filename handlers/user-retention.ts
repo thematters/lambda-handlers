@@ -12,5 +12,6 @@ const intervalInDays =
   parseInt(process.env.USER_RETENTION_INTERVAL_IN_DAYS as string, 10) || 5;
 
 export const handler = async (event: any) => {
-  await processUserRetention({ intervalInDays });
+  const limit = event.limit;
+  await processUserRetention({ intervalInDays, limit });
 };
