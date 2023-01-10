@@ -1,8 +1,10 @@
+import { invalidateFQC } from "@matters/apollo-response-cache";
 import axios, { AxiosRequestConfig, AxiosHeaders } from "axios";
 import { Knex } from "knex";
 import _ from "lodash";
 
 import { pgKnex } from "./db.js";
+import { Cache } from "./cache.js";
 
 // ENV
 
@@ -49,9 +51,11 @@ interface SendPVData {
   url: string;
 }
 
-interface GetCivicLikerData {
-  userId: string;
+interface UpdateCivicLikerCacheData {
   likerId: string;
+  userId: string;
+  key: string;
+  expire: number;
 }
 
 const ENDPOINT = {
@@ -97,6 +101,38 @@ export class LikeCoin {
     const result = await this.requestCount({
       liker: liker,
       ...data,
+    });
+  };
+
+  updateCivicLikerCache = async ({
+    likerId,
+    userId,
+    key,
+    expire,
+  }: UpdateCivicLikerCacheData) => {
+    const cache = new Cache();
+    let isCivicLiker;
+    try {
+      isCivicLiker = await this.requestIsCivicLiker({
+        likerId,
+      });
+    } catch (e) {
+      // remove from cache so new reqeust can trigger a retry
+      await cache.removeObject({ key });
+      throw e;
+    }
+
+    // update cache
+    await cache.storeObject({
+      key,
+      data: isCivicLiker,
+      expire,
+    });
+
+    // invalidation should after data update
+    await invalidateFQC({
+      node: { type: "User", id: userId },
+      redis: { client: cache.redis },
     });
   };
 
@@ -170,6 +206,16 @@ export class LikeCoin {
     }
 
     return data.count;
+  };
+
+  private requestIsCivicLiker = async ({ likerId }: { likerId: string }) => {
+    const res = await this.request({
+      endpoint: `/users/id/${likerId}/min`,
+      method: "GET",
+      timeout: 2000,
+      // liker,
+    });
+    return !!_.get(res, "data.isSubscribedCivicLiker");
   };
 
   private request = async ({

@@ -1,10 +1,12 @@
 import { SQSEvent } from "aws-lambda";
 import { LikeCoin } from "../lib/likecoin.js";
 
-// envs
+// env
 // MATTERS_LIKECOIN_API_URL
 // MATTERS_LIKECOIN_CLIENT_ID
 // MATTERS_LIKECOIN_CLIENT_SECRET
+// MATTERS_CACHE_HOST
+// MATTERS_CACHE_PORT
 
 const likecoin = new LikeCoin();
 
@@ -12,7 +14,7 @@ export const handler = async (event: SQSEvent) => {
   console.log(event);
   const results = await Promise.allSettled(
     event.Records.map(({ body }: { body: string }) =>
-      likecoin.sendPV(JSON.parse(body))
+      likecoin.updateCivicLikerCache(JSON.parse(body))
     )
   );
 
