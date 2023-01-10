@@ -31,7 +31,6 @@ export const processUserRetention = async ({
   const target = limit === undefined ? users : users.slice(0, limit);
   for (const { userId, state, stateUpdatedAt, lastSeen } of target) {
     const stateDuration = +now - +stateUpdatedAt;
-    console.log({ userId, state, stateUpdatedAt, lastSeen, stateDuration });
     if (lastSeen > stateUpdatedAt) {
       await markUserState(userId, "NORMAL");
     } else if (stateDuration > intervalInMs) {
