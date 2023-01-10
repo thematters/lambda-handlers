@@ -14,6 +14,7 @@ const intervalInDays =
   5;
 
 export const handler = async (event: any) => {
+  console.log({ env: process.env });
   const limit = event.limit;
   await processUserRetention({ intervalInDays, limit });
 };
