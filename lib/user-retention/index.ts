@@ -23,6 +23,7 @@ export const processUserRetention = async ({
 
   const now = new Date();
   const intervalInMs = intervalInDays * 86400000;
+  console.log({ intervalInMs });
 
   const sendmails = [];
 
