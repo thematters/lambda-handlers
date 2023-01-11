@@ -84,7 +84,7 @@ const markNewUsers = async () => {
     SELECT id, 'NEWUSER' FROM public.user 
     WHERE 
       created_at >= (CURRENT_TIMESTAMP - '1 day'::interval)
-      AND id NOT IN (SELECT id FROM user_retention_history);`;
+      AND id NOT IN (SELECT user_id FROM user_retention_history);`;
 };
 
 const markActiveUsers = async () => {
