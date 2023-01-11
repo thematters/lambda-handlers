@@ -253,7 +253,7 @@ const loadFolloweeHotArticles = async (
     lastSeen,
     limit,
     sql`SELECT target_id FROM action_user WHERE user_id=${userId} AND action='follow'`,
-    sql(excludedArticleIds)
+    sql(excludedArticleIds.length > 0 ? excludedArticleIds : ["0"])
   );
 };
 
