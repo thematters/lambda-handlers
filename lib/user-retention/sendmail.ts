@@ -166,7 +166,7 @@ const loadRecommendedUsers = async (
       SELECT target_id, 1 AS is_followee FROM action_user WHERE action='follow' AND user_id=${userId}
     ) user_followee
       ON u.id=user_followee.target_id
-    WHERE u.state='active' OR u.state='onboarding'
+    WHERE (u.state='active' OR u.state='onboarding') AND (num_donations > 0 OR num_appreciations > 0 OR follow_at IS NOT NULL)
     ORDER BY 
       num_donations DESC NULLS LAST,
       num_appreciations DESC NULLS LAST,
