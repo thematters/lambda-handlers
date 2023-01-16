@@ -1,18 +1,19 @@
 import postgres from "postgres";
 import knex from "knex";
 import { knexSnakeCaseMappers } from "objection";
-import pkg from "../package.json" assert { type: "json" };
+//import pkg from "../package.json" assert { type: "json" };
+
+const databaseURL = process.env.PG_CONNECTION_STRING || "";
 
 export const pgKnex = knex({
   client: "pg",
-  connection: process.env.PG_CONNECTION_STRING,
+  connection: databaseURL,
   pool: { min: 0, max: 2 },
 
   // searchPath: ["knex", "public"],
   ...knexSnakeCaseMappers(),
 });
 
-const databaseURL = process.env.PG_CONNECTION_STRING || "";
 export const sql = postgres(databaseURL, {
   // idle_timeout: 300 for 5min, // auto end when idl'ing, use PGIDLE_TIMEOUT
   // connect_timeout: 10,
@@ -32,7 +33,8 @@ export const sql = postgres(databaseURL, {
   },
   connection: {
     // TBD change to actual name of each app
-    application_name: `${pkg.name}/${pkg.version}`, // "lambda-handlers-image:v2022-12-09", // 'postgres.js', // Default application_name
+    application_name: `${process.env.AWS_LAMBDA_FUNCTION_NAME}/${process.env.AWS_LAMBDA_FUNCTION_VERSION}`, // "lambda-handlers-image:v2022-12-09"
+    // application_name: `${process.env.npm_package_name}/${process.env.npm_package_version}`, // "lambda-handlers-image:v2022-12-09"
     // statement_timeout: 10e3,
     // connect_timeout: 10e3,
   },
