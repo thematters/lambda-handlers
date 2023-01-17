@@ -45,5 +45,5 @@ jobs:
           MATTERS_PG_USER: postgres
           MATTERS_PG_PASSWORD: postgres
           MATTERS_PG_DATABASE: matters-test
-          PG_CONNECTION_STRING: postgresql://postgres:postgres@localhost:5432/matters-test
+          PG_CONNECTION_STRING: postgresql://postgres:postgres@localhost:5432/test_matters-test
 
