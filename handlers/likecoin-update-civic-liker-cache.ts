@@ -33,6 +33,6 @@ export const handler = async (event: SQSEvent) => {
           return { itemIdentifier: event.Records[index].messageId };
         }
       })
-      .filter((e) => e !== undefined),
+      .filter(Boolean),
   };
 };
