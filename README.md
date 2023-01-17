@@ -8,8 +8,8 @@ feat(lambda): multiple lambda handlers in one repo
 - [x] check-motor-badge
 - [x] sendmail
 - [ ] ipns-listener
-- [ ] user-retention
-- [x] likecoin
+- [x] user-retention
+- [ ] likecoin
 
 ## Dependencies
 

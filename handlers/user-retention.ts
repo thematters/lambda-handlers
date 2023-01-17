@@ -10,10 +10,11 @@ import { processUserRetention } from "../lib/user-retention/index.js";
 // MATTERS_USER_RETENTION_INTERVAL_IN_DAYS
 
 const intervalInDays =
-  parseInt(process.env.MATTERS_USER_RETENTION_INTERVAL_IN_DAYS as string, 10) ||
-  5;
+  parseFloat(process.env.MATTERS_USER_RETENTION_INTERVAL_IN_DAYS as string) ||
+  6;
 
 export const handler = async (event: any) => {
+  // console.log({ env: process.env });
   const limit = event.limit;
   await processUserRetention({ intervalInDays, limit });
 };

@@ -23,6 +23,7 @@ export const processUserRetention = async ({
 
   const now = new Date();
   const intervalInMs = intervalInDays * 86400000;
+  console.log({ intervalInMs });
 
   const sendmails = [];
 
@@ -53,6 +54,13 @@ export const processUserRetention = async ({
           break;
       }
     }
+    console.log({
+      userId,
+      state,
+      stateUpdatedAt,
+      lastSeen,
+      msg: "hit do nothing",
+    });
     // else stateDuration < intervalInMs , do nothing
   }
   console.timeEnd("loop");
@@ -76,7 +84,7 @@ const markNewUsers = async () => {
     SELECT id, 'NEWUSER' FROM public.user 
     WHERE 
       created_at >= (CURRENT_TIMESTAMP - '1 day'::interval)
-      AND id NOT IN (SELECT id FROM user_retention_history);`;
+      AND id NOT IN (SELECT user_id FROM user_retention_history);`;
 };
 
 const markActiveUsers = async () => {

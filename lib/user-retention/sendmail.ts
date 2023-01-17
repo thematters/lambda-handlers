@@ -118,7 +118,7 @@ const loadHottestArticles = async (
     FROM article_hottest_materialized h 
     JOIN article a ON h.id = a.id
     JOIN public.user u ON a.author_id=u.id
-    WHERE h.id NOT IN (SELECT article_id FROM article_read_count WHERE user_id=${userId})
+    WHERE h.id NOT IN (SELECT article_id FROM article_read_count WHERE user_id=${userId}) AND a.author_id != ${userId}
     ORDER BY h.score DESC
     LIMIT ${limit};
 `;
@@ -166,7 +166,7 @@ const loadRecommendedUsers = async (
       SELECT target_id, 1 AS is_followee FROM action_user WHERE action='follow' AND user_id=${userId}
     ) user_followee
       ON u.id=user_followee.target_id
-    WHERE u.state='active' AND ( num_donations > 0 OR num_appreciations > 0)
+    WHERE (u.state='active' OR u.state='onboarding') AND (num_donations > 0 OR num_appreciations > 0 OR follow_at IS NOT NULL)
     ORDER BY 
       num_donations DESC NULLS LAST,
       num_appreciations DESC NULLS LAST,
@@ -253,7 +253,7 @@ const loadFolloweeHotArticles = async (
     lastSeen,
     limit,
     sql`SELECT target_id FROM action_user WHERE user_id=${userId} AND action='follow'`,
-    sql(excludedArticleIds)
+    sql(excludedArticleIds.length > 0 ? excludedArticleIds : ["0"])
   );
 };
 
