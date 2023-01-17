@@ -29,7 +29,6 @@
     "ioredis": "^5.2.4",
     "ipfs-http-client": "^59.0.0",
     "knex": "^2.3.0",
-    "lodash": "^4.17.21",
     "meilisearch": "^0.30.0",
     "objection": "^3.0.1",
     "opencc": "^1.1.3",

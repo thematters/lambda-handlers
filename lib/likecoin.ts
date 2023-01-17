@@ -1,7 +1,6 @@
 import { invalidateFQC } from "@matters/apollo-response-cache";
 import axios, { AxiosRequestConfig, AxiosHeaders } from "axios";
 import { Knex } from "knex";
-import _ from "lodash";
 
 import { pgKnex } from "./db.js";
 import { Cache } from "./cache.js";
@@ -163,7 +162,7 @@ export class LikeCoin {
         referrer: encodeURI(url),
       },
     });
-    const data = _.get(result, "data");
+    const data = result?.data;
     if (data === "OK") {
       return data;
     } else {
@@ -199,7 +198,7 @@ export class LikeCoin {
         referrer: encodeURI(url),
       },
     });
-    const data = _.get(res, "data");
+    const data = res?.data;
 
     if (!data) {
       throw res;
@@ -215,7 +214,7 @@ export class LikeCoin {
       timeout: 2000,
       // liker,
     });
-    return !!_.get(res, "data.isSubscribedCivicLiker");
+    return !!res?.data?.isSubscribedCivicLiker;
   };
 
   private request = async ({
@@ -272,8 +271,8 @@ export class LikeCoin {
       // call makeRequest at most twice
       try {
         return await makeRequest();
-      } catch (e) {
-        const err = _.get(e, "response.data") as any;
+      } catch (e: any) {
+        const err = e.response?.data as any;
 
         switch (err) {
           case ERROR_CODE.TOKEN_EXPIRED:
@@ -319,7 +318,7 @@ export class LikeCoin {
     });
 
     // update db
-    const data = _.get(res, "data");
+    const data = res?.data;
     try {
       await this.knex("user_oauth_likecoin")
         .where({ likerId: liker.likerId })
