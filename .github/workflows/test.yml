@@ -13,8 +13,19 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:12-alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_DB: matters-test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: true
       - uses: actions/setup-node@v3
         with:
           node-version: 18
@@ -24,9 +35,15 @@ jobs:
         run: |
           npm run lint \
           && npm run format:check
-
-      - name: Build & Test
-        run: |
-          npm run build \
-          && npm run test --if-present
+      - name: Build
+        run: npm run build
+      - name: Test
+        run: npm run test
+        env:
+          MATTERS_ENV: test
+          MATTERS_PG_HOST: localhost
+          MATTERS_PG_USER: postgres
+          MATTERS_PG_PASSWORD: postgres
+          MATTERS_PG_DATABASE: matters-test
+          PG_CONNECTION_STRING: postgresql://postgres:postgres@localhost:5432/test_matters-test
 

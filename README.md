@@ -1,3 +1,5 @@
+# lambda handlers
+
 Multiple lambda packaged in one docker image, and to create multiple lambda handlers:
 
 ## Lambda functions
@@ -18,7 +20,21 @@ use docker image for lambda, instead of zip packages:
 - handle dependencies better (ipfs-http-client, opencc, etc);
 - can use latest node-v18 & typescript together, (many other tools have failed)
 
-# Deployment
+## Development
+
+### Setup
+
+- Pull submodule:  `git submodule update --init`
+- Install deps: `npm install .`
+
+
+### Format & Lint & Test
+
+- Run format: `npm run format`
+- Run lint: `npm run lint`
+- Run test cases: `npm run test`
+
+## Deployment
 
 merge to `main` will trigger build docker image and publish to ECR registry, with version like:
 
@@ -28,7 +44,7 @@ Tips: at development phase, can also manually run `docker build -t {above-full-i
 do a login `docker login --username AWS --password-stdin <account>.dkr.ecr.ap-southeast-1.amazonaws.com` first,
 and push it with `docker image push {above-full-image}:v{date-tag}`, test it with manually update lambda function image;
 
-# Create new lambda worker:
+### Create new lambda worker:
 
 1. create handler entry code in `./handlers/<new-lambda>.ts`, export the handler;
 2. create a one liner entry code at top level, like:
@@ -43,7 +59,7 @@ and push it with `docker image push {above-full-image}:v{date-tag}`, test it wit
 
 Can test trigger from the AWS Lambda Console
 
-## Add manual auto deploy in Github Action:
+### Add manual auto deploy in Github Action:
 
 after first time manually create the Lambda function, all later updates can be done in Action CI:
 add proper `deploy-<new-lambda>-dev` `deploy-<new-lambda>-prod` jobs in `.github/workflows/deploy.yml`,

@@ -1,0 +1,4 @@
+[submodule "matters-server"]
+	path = matters-server
+	url = git@github.com:thematters/matters-server.git
+	branch = develop
