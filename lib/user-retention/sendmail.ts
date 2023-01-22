@@ -1,7 +1,7 @@
 import { sql } from "../../lib/db.js";
 import { Mail } from "../../lib/mail.js";
 
-const sgKey = process.env.SENDGRID_API_KEY || "";
+const sgKey = process.env.MATTERS_SENDGRID_API_KEY || "";
 const siteDomain = process.env.MATTERS_SITE_DOMAIN || "";
 const newFeatureTagId = process.env.MATTERS_NEW_FEATURE_TAG_ID || "";
 const isProd = siteDomain === "https://matters.news";
