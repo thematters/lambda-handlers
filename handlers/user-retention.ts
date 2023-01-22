@@ -4,7 +4,7 @@ import { processUserRetention } from "../lib/user-retention/index.js";
 // envs need to provide:
 // PG_CONNECTION_STRING
 // PGPASSWORD
-// SENDGRID_API_KEY
+// MATTERS_SENDGRID_API_KEY
 // MATTERS_SITE_DOMAIN
 // MATTERS_NEW_FEATURE_TAG_ID;
 // MATTERS_USER_RETENTION_INTERVAL_IN_DAYS
