@@ -1,5 +1,5 @@
-import { handler } from '../user-retention'
+import { handler } from "../user-retention";
 
-test("run handler", async() => {
-  await handler({limit: 0})
+test("run handler", async () => {
+  await handler({ limit: 0 });
 });

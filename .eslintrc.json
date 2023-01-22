@@ -1,5 +1,10 @@
 {
-  "ignorePatterns": ["./dist/**/*.js", "**/vendor/*.js", "matters-server/**/**", "**/__test__/**"],
+  "ignorePatterns": [
+    "./dist/**/*.js",
+    "**/vendor/*.js",
+    "matters-server/**/**",
+    "**/__test__/**"
+  ],
   "env": {
     "node": true,
     "browser": true,
