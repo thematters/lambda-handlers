@@ -28,9 +28,12 @@
     "uuid": "^9.0.0"
   },
   "dependencies": {
+    "@matters/apollo-response-cache": "^1.4.0-rc.0",
     "@sendgrid/helpers": "^7.7.0",
     "@sendgrid/mail": "^7.7.0",
+    "axios": "^1.2.2",
     "cheerio": "^1.0.0-rc.12",
+    "ioredis": "^5.2.4",
     "ipfs-http-client": "^59.0.0",
     "knex": "^2.3.0",
     "meilisearch": "^0.30.0",
