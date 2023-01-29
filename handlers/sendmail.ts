@@ -1,7 +1,7 @@
 import { Context, APIGatewayProxyResult, APIGatewayEvent } from "aws-lambda";
 import { Mail } from "../lib/mail.js";
 
-const sgKey = process.env.SENDGRID_API_KEY || "";
+const sgKey = process.env.MATTERS_SENDGRID_API_KEY || "";
 
 const mail = new Mail(sgKey);
 

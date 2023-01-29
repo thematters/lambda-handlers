@@ -11,9 +11,7 @@ export const processUserRetention = async ({
   console.time("markNewUsers");
   await markNewUsers();
   console.timeEnd("markNewUsers");
-  console.time("markActiveUsers");
   await markActiveUsers();
-  console.timeEnd("markActiveUsers");
 
   // fetch needed users data to check and change retention state
   console.time("fetchUsersData");
@@ -59,7 +57,6 @@ export const processUserRetention = async ({
       state,
       stateUpdatedAt,
       lastSeen,
-      msg: "hit do nothing",
     });
     // else stateDuration < intervalInMs , do nothing
   }
@@ -89,6 +86,7 @@ const markNewUsers = async () => {
 
 const markActiveUsers = async () => {
   // active users from exsited users
+  console.time("markActiveUsers1");
   await sql`
     INSERT INTO user_retention_history (user_id, state)
     -- users read 0.1+ hours last 2 mouth
@@ -106,8 +104,10 @@ const markActiveUsers = async () => {
     -- except marked users
     EXCEPT SELECT user_id, 'ACTIVE' 
       FROM user_retention_history;`;
+  console.timeEnd("markActiveUsers1");
 
   // active users from NORMAL, INACTIVE pool
+  console.time("markActiveUsers2");
   await sql`
     -- helper table contains: users whose latest retention state are NORMAL / INACTIVE 
     WITH user_retention AS (
@@ -137,6 +137,7 @@ const markActiveUsers = async () => {
         GROUP BY article.author_id
         HAVING count(article.id) >= 1
     );`;
+  console.timeEnd("markActiveUsers2");
 };
 
 const fetchUsersData = async () => {
