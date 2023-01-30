@@ -1,4 +1,4 @@
-import type { LANGUAGE } from "../types";
+import type { Language } from "../types";
 
 import { sql } from "../../lib/db.js";
 import { Mail } from "../../lib/mail.js";
@@ -67,7 +67,7 @@ export const sendmail = async (
 type UserInfo = {
   displayName: string;
   email: string;
-  language: LANGUAGE;
+  language: Language;
   createdAt: Date;
 };
 
@@ -195,7 +195,7 @@ const loadNewFeatureArticles = async (
 const getSubject = (
   displayName: string,
   type: "NEWUSER" | "ACTIVE",
-  language: LANGUAGE
+  language: Language
 ): string => {
   const subjects = {
     NEWUSER: {
@@ -213,7 +213,7 @@ const getSubject = (
   return copys[language];
 };
 
-const getTemplateId = (language: LANGUAGE): string => {
+const getTemplateId = (language: Language): string => {
   const templateIdsDev = {
     zh_hant: "d-550c209eef09442d8430fed10379593a",
     zh_hans: "d-22b0f1c254d74cadaf6b2d246e0b4c14",

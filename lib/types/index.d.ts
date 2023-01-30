@@ -22,4 +22,4 @@ export type User = {
   ethAddress: string;
 };
 
-export type LANGUAGE = "zh_hant" | "zh_hans" | "en";
+export type Language = "zh_hant" | "zh_hans" | "en";

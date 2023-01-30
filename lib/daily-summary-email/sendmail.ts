@@ -1,4 +1,4 @@
-import type { LANGUAGE } from "../types";
+import type { Language } from "../types";
 
 import _ from "lodash";
 
@@ -28,7 +28,7 @@ export const sendmail = async ({
   recipient: {
     displayName: string;
   };
-  language: LANGUAGE;
+  language: Language;
   notices: {
     user_new_follower: NoticeItem[];
     article_new_collected: NoticeItem[];
@@ -200,7 +200,7 @@ export const sendmail = async ({
 
 // helpers
 
-const getSubject = (language: LANGUAGE, displayName: string): string => {
+const getSubject = (language: Language, displayName: string): string => {
   const copys = {
     zh_hant: `🐿️  ${displayName}，這是專屬於你的 Matters 日報`,
     zh_hans: `🐿️  ${displayName}，这是专属于你的 Matters 日报`,
@@ -209,7 +209,7 @@ const getSubject = (language: LANGUAGE, displayName: string): string => {
   return copys[language];
 };
 
-const getTemplateId = (language: LANGUAGE): string => {
+const getTemplateId = (language: Language): string => {
   const templateIdsDev = {
     zh_hant: "d-805ccf4182244f59a5388b581df1eeab",
     zh_hans: "d-e242f3e39f014279966e43425b208cbe",
