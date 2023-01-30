@@ -2,12 +2,13 @@ import { MailDataRequired } from "@sendgrid/helpers/classes/mail";
 import sgMail from "@sendgrid/mail";
 
 const bcc = process.env.MATTERS_SENDGRID_BCC_MAIL_ADDRESS;
+const sgKey = process.env.MATTERS_SENDGRID_API_KEY || "";
 
 export class Mail {
   mail: typeof sgMail;
 
-  constructor(apiKey: string) {
-    this.mail = this.__setup(apiKey);
+  constructor() {
+    this.mail = this.__setup(sgKey);
   }
 
   __setup = (apiKey: string) => {
