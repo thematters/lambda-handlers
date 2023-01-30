@@ -127,8 +127,7 @@ class Notice {
    */
   findEntities = async (
     noticeId: string,
-    expand: boolean = true
-  ): Promise<NoticeEntity[] | NoticeEntitiesMap> => {
+  ): Promise<NoticeEntitiesMap> => {
     const entities = await this.knex
       .select([
         "notice_entity.type",
@@ -144,25 +143,21 @@ class Notice {
       )
       .where({ noticeId });
 
-    if (expand) {
-      const _entities = {} as any;
+    const _entities = {} as any;
 
-      await Promise.all(
-        entities.map(async ({ type, entityId, table }: any) => {
-          const entity = await this.knex
-            .select()
-            .from(table)
-            .where({ id: entityId })
-            .first();
+    await Promise.all(
+      entities.map(async ({ type, entityId, table }: any) => {
+        const entity = await this.knex
+          .select()
+          .from(table)
+          .where({ id: entityId })
+          .first();
 
-          _entities[type] = entity;
-        })
-      );
+        _entities[type] = entity;
+      })
+    );
 
-      return _entities;
-    }
-
-    return entities;
+    return _entities;
   };
 
   /**
