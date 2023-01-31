@@ -58,7 +58,7 @@ export type NoticeItem = NoticeDetail & {
   entities?: NoticeEntitiesMap;
 };
 
-class Notice {
+export class Notice {
   knex: Knex;
 
   constructor() {
@@ -125,9 +125,7 @@ class Notice {
   /**
    * Find notice entities by a given notice id
    */
-  findEntities = async (
-    noticeId: string,
-  ): Promise<NoticeEntitiesMap> => {
+  findEntities = async (noticeId: string): Promise<NoticeEntitiesMap> => {
     const entities = await this.knex
       .select([
         "notice_entity.type",
@@ -254,5 +252,3 @@ class Notice {
     return uniqNotices;
   };
 }
-
-export const notice = new Notice();

@@ -14,7 +14,7 @@ type UserDigest = {
   id: string;
   userName: string;
   displayName: string;
-  avatar: string;
+  avatar: string | null;
 };
 
 type ArticlePartial = {

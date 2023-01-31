@@ -1,12 +1,13 @@
 import { DB_NOTICE_TYPE } from "./enum.js";
 import type { DBNoticeType } from "./notice";
-import { notice } from "./notice.js";
+import { Notice } from "./notice.js";
 import { sendmail } from "./sendmail.js";
 
 export const sendDailySummaryEmails = async () => {
+  const notice = new Notice();
   const users = await notice.findDailySummaryUsers();
 
-  users.forEach(async (user, index) => {
+  const jobs = users.map(async (user, index) => {
     const notices = await notice.findDailySummaryNoticesByUser(user.id);
 
     if (!notices || notices.length <= 0) {
@@ -16,7 +17,7 @@ export const sendDailySummaryEmails = async () => {
     const filterNotices = (type: DBNoticeType) =>
       notices.filter((notice) => notice.noticeType === type);
 
-    sendmail({
+    await sendmail({
       to: user.email,
       recipient: {
         displayName: user.displayName,
@@ -64,4 +65,5 @@ export const sendDailySummaryEmails = async () => {
       language: user.language,
     });
   });
+  await Promise.all(jobs);
 };

@@ -2,8 +2,18 @@ import postgres from "postgres";
 import knex from "knex";
 import { knexSnakeCaseMappers } from "objection";
 //import pkg from "../package.json" assert { type: "json" };
+//
+const isTest = process.env.MATTERS_ENV === "test";
 
-const databaseURL = process.env.PG_CONNECTION_STRING || "";
+const dbHost = process.env.MATTERS_PG_HOST || "";
+const dbUser = process.env.MATTERS_PG_USER || "";
+const dbPasswd = process.env.MATTERS_PG_PASSWORD || "";
+const _dbName = process.env.MATTERS_PG_DATABASE || "";
+const dbName = isTest ? "test_" + _dbName : _dbName;
+
+const databaseURL =
+  process.env.PG_CONNECTION_STRING ||
+  `postgresql://${dbUser}:${dbPasswd}@${dbHost}:5432/${dbName}`;
 
 export const pgKnex = knex({
   client: "pg",

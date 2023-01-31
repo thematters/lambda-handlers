@@ -1,6 +1,7 @@
 import { MailDataRequired } from "@sendgrid/helpers/classes/mail";
 import sgMail from "@sendgrid/mail";
 
+const isTest = process.env.MATTERS_ENV === "test";
 const bcc = process.env.MATTERS_SENDGRID_BCC_MAIL_ADDRESS;
 const sgKey = process.env.MATTERS_SENDGRID_API_KEY || "";
 
@@ -17,6 +18,9 @@ export class Mail {
   };
 
   send = async (params: MailDataRequired) => {
+    if (isTest) {
+      return;
+    }
     if (bcc) {
       params.personalizations = (params.personalizations as any).map(
         (i: any) => ({
@@ -25,7 +29,7 @@ export class Mail {
         })
       );
     }
-    console.log(params);
+    // console.log(params);
     await this.mail.send({
       mailSettings: {
         bypassListManagement: { enable: true },
