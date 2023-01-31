@@ -1,25 +1,32 @@
-import { Context, APIGatewayProxyResult, APIGatewayEvent } from "aws-lambda";
+import { SQSEvent } from "aws-lambda";
 import { Mail } from "../lib/mail.js";
 
 const sgKey = process.env.MATTERS_SENDGRID_API_KEY || "";
 
 const mail = new Mail(sgKey);
 
-export const handler = async (
-  event: any, // APIGatewayEvent,
-  context: Context
-): Promise<APIGatewayProxyResult> => {
+export const handler = async (event: SQSEvent) => {
   console.log(event.Records);
-  await Promise.all(
+  const results = await Promise.allSettled(
     event.Records.map(({ body }: { body: string }) =>
       mail.send(JSON.parse(body))
     )
   );
+  // print failed reseaon
+  results.map((res) => {
+    if (res.status === "rejected") {
+      console.error(res.reason);
+    }
+  });
 
+  // https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html#services-sqs-batchfailurereporting
   return {
-    statusCode: 200,
-    body: JSON.stringify({
-      message: "done.",
-    }),
+    batchItemFailures: results
+      .map((res, index) => {
+        if (res.status === "rejected") {
+          return { itemIdentifier: event.Records[index].messageId };
+        }
+      })
+      .filter(Boolean),
   };
 };

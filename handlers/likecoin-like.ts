@@ -5,6 +5,8 @@ import { LikeCoin } from "../lib/likecoin.js";
 // MATTERS_LIKECOIN_API_URL
 // MATTERS_LIKECOIN_CLIENT_ID
 // MATTERS_LIKECOIN_CLIENT_SECRET
+// PG_CONNECTION_STRING
+// PGPASSWORD
 
 const likecoin = new LikeCoin();
 
