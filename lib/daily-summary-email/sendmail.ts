@@ -1,6 +1,5 @@
 import type { Language } from "../types";
-
-import _ from "lodash";
+import type { DBNoticeType } from "./notice";
 
 import { DB_NOTICE_TYPE } from "./enum.js";
 import { Mail } from "../../lib/mail.js";
@@ -152,18 +151,18 @@ export const sendmail = async ({
           siteDomain,
           recipient,
           section: {
-            follow: !!_.get(notices.user_new_follower, "0"),
+            follow: !!notices.user_new_follower[0],
             article: [
               DB_NOTICE_TYPE.article_new_collected,
               DB_NOTICE_TYPE.article_new_appreciation,
               DB_NOTICE_TYPE.article_new_subscriber,
               DB_NOTICE_TYPE.article_new_comment,
-            ].some((type) => _.get(notices, `${type}.0`)),
+            ].some((type: string) => (notices as any)[type][0]),
             mention: [
               DB_NOTICE_TYPE.article_mentioned_you,
               DB_NOTICE_TYPE.comment_mentioned_you,
               DB_NOTICE_TYPE.comment_new_reply,
-            ].some((type) => _.get(notices, `${type}.0`)),
+            ].some((type: string) => (notices as any)[type][0]),
           },
           notices: {
             user_new_follower,
