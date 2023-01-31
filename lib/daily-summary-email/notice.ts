@@ -1,5 +1,6 @@
 import type { User } from "../types";
-import { uniqBy } from "lodash";
+
+import uniqBy from "lodash.uniqby";
 import { Knex } from "knex";
 
 import { pgKnex } from "../db.js";
