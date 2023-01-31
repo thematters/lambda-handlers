@@ -1,12 +1,14 @@
+import type { Language } from "../types";
+
 import { sql } from "../../lib/db.js";
 import { Mail } from "../../lib/mail.js";
+import { DAY, EMAIL_FROM_ASK } from "../../lib/constants/index.js";
 
-const sgKey = process.env.MATTERS_SENDGRID_API_KEY || "";
 const siteDomain = process.env.MATTERS_SITE_DOMAIN || "";
 const newFeatureTagId = process.env.MATTERS_NEW_FEATURE_TAG_ID || "";
 const isProd = siteDomain === "https://matters.news";
 
-const mail = new Mail(sgKey);
+const mail = new Mail();
 
 export const sendmail = async (
   userId: string,
@@ -37,7 +39,7 @@ export const sendmail = async (
       ? await loadHottestArticles(userId, 3)
       : [];
   await mail.send({
-    from: "Matters<ask@matters.news>",
+    from: EMAIL_FROM_ASK,
     templateId: getTemplateId(language),
     personalizations: [
       {
@@ -61,8 +63,6 @@ export const sendmail = async (
 };
 
 // helpers
-
-type Language = "zh_hant" | "zh_hans" | "en";
 
 type UserInfo = {
   displayName: string;
@@ -316,9 +316,8 @@ const loadArticles = async (
     `;
 
 const getDays = (past: Date) => {
-  const oneDay = 24 * 60 * 60 * 1000;
   const now = new Date();
-  return Math.round(Math.abs((+now - +past) / oneDay));
+  return Math.round(Math.abs((+now - +past) / DAY));
 };
 
 // const mediaHashToLink = (siteDomain: string, mediaHash: string) => `https://${siteDomain}/@-/-${mediaHash}`

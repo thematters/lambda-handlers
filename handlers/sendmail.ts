@@ -1,9 +1,10 @@
 import { SQSEvent } from "aws-lambda";
 import { Mail } from "../lib/mail.js";
 
-const sgKey = process.env.MATTERS_SENDGRID_API_KEY || "";
+// envs
+// MATTERS_SENDGRID_API_KEY
 
-const mail = new Mail(sgKey);
+const mail = new Mail();
 
 export const handler = async (event: SQSEvent) => {
   console.log(event.Records);
