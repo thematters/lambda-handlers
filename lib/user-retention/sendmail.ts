@@ -272,6 +272,10 @@ const loadArticles = async (
     FROM article 
     INNER JOIN public.user u
       ON author_id = u.id
+        AND article.created_at >= ${lastSeen}
+        AND article.author_id IN (${targetAuthorIdFragment})
+        AND article.id NOT IN (SELECT article_id FROM article_read_count WHERE user_id=${userId})
+        AND article.id NOT IN ${excludedArticleIdsFragment}
     LEFT OUTER JOIN (
       SELECT target_id, COUNT(id) AS num_donations
         FROM transaction
@@ -299,15 +303,9 @@ const loadArticles = async (
     ) article_comment 
       ON article.id = article_comment.target_id
     WHERE 
-      article.created_at >= ${lastSeen}
-      AND article.author_id IN (${targetAuthorIdFragment})
-      AND article.id NOT IN (SELECT article_id FROM article_read_count WHERE user_id=${userId})
-      AND article.id NOT IN ${excludedArticleIdsFragment}
-      AND (
-        article_donation.num_donations >= 1
-        OR article_appreciation.num_appreciation >= 15
-        OR article_comment.num_comments >= 2
-      )
+      article_donation.num_donations >= 1
+      OR article_appreciation.num_appreciation >= 15
+      OR article_comment.num_comments >= 2
     ORDER BY
       article_donation.num_donations DESC NULLS LAST,
       article_appreciation.num_appreciation DESC NULLS LAST,
