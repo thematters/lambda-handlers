@@ -90,7 +90,7 @@ const loadUserInfo = async (userId: string): Promise<UserInfo> => {
   return res[0] as UserInfo;
 };
 
-const loadRecommendedArticles = async (
+export const loadRecommendedArticles = async (
   userId: string,
   lastSeen: Date,
   limit: number
