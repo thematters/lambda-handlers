@@ -4,19 +4,20 @@ import { knexSnakeCaseMappers } from "objection";
 
 const baseApplicationName = `${process.env.AWS_LAMBDA_FUNCTION_NAME}/${process.env.AWS_LAMBDA_FUNCTION_VERSION}`;
 
-export const getKnexClient = (connectionURI: string) =>
+export const getKnexClient = (connectionString: string) =>
   knex({
     client: "pg",
+    // TBD: handler connectionString having query-string
     connection:
-      connectionURI + `?application_name=${baseApplicationName + "/knex"}`,
+      connectionString + `?application_name=${baseApplicationName + "/knex"}`,
     pool: { min: 0, max: 2 },
 
     // searchPath: ["knex", "public"],
     ...knexSnakeCaseMappers(),
   });
 
-export const getPostgresJsClient = (connectionURI: string) =>
-  postgres(connectionURI, {
+export const getPostgresJsClient = (connectionString: string) =>
+  postgres(connectionString, {
     // idle_timeout: 300 for 5min, // auto end when idl'ing, use PGIDLE_TIMEOUT
     // connect_timeout: 10,
     // idle_timeout: 20,

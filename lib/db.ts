@@ -20,15 +20,9 @@ export const sql = getPostgresJsClient(databaseURL);
 
 // read-only connection client
 
-const dbRoHost = process.env.MATTERS_PG_RO_HOST || "";
-const dbRoUser = process.env.MATTERS_PG_RO_USER || "";
-const dbRoPasswd = process.env.MATTERS_PG_RO_PASSWORD || "";
-const _dbRoName = process.env.MATTERS_PG_RO_DATABASE || "";
-const dbRoName = isTest ? "test_" + _dbRoName : _dbRoName;
-
-const databaseRoURL = dbRoHost
-  ? `postgresql://${dbRoUser}:${dbRoPasswd}@${dbRoHost}:5432/${dbRoName}`
-  : "postgresql://no-exist@no-exist/no-exist";
+const databaseRoURL =
+  process.env.MATTERS_PG_RO_CONNECTION_STRING ||
+  "postgresql://no-exist@no-exist/no-exist";
 
 export const pgKnexRO = getKnexClient(databaseRoURL);
 export const sqlRO = getPostgresJsClient(databaseRoURL);
