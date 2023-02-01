@@ -52,12 +52,6 @@ export const processUserRetention = async ({
           break;
       }
     }
-    console.log({
-      userId,
-      state,
-      stateUpdatedAt,
-      lastSeen,
-    });
     // else stateDuration < intervalInMs , do nothing
   }
   console.timeEnd("loop");
