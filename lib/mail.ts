@@ -19,7 +19,7 @@ export class Mail {
 
   send = async (params: MailDataRequired) => {
     if (isTest) {
-      console.dir(params, {depth: null});
+      console.dir(params, { depth: null });
       return;
     }
     if (bcc) {
