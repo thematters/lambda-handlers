@@ -319,9 +319,3 @@ const getDays = (past: Date) => {
   const now = new Date();
   return Math.round(Math.abs((+now - +past) / DAY));
 };
-
-// const mediaHashToLink = (siteDomain: string, mediaHash: string) => `https://${siteDomain}/@-/-${mediaHash}`
-
-//sendmail("3685", new Date("2022-10-18"), "NEWUSER", async () => {
-//  process.exit();
-//});
