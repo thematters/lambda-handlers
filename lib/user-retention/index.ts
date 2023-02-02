@@ -74,7 +74,7 @@ const markNewUsers = async () => {
     INSERT INTO user_retention_history (user_id, state) 
     SELECT id, 'NEWUSER' FROM public.user 
     WHERE 
-      created_at >= (CURRENT_TIMESTAMP - '1 day'::interval)
+      created_at >= (CURRENT_TIMESTAMP - '2 day'::interval)
       AND id NOT IN (SELECT user_id FROM user_retention_history);`;
 };
 
