@@ -279,14 +279,14 @@ const loadArticles = async (
     LEFT OUTER JOIN (
       SELECT target_id, COUNT(id) AS num_donations
         FROM transaction
-        WHERE purpose='donation' AND state='succeeded' AND target_type=4
+        WHERE created_at >= ${lastSeen} AND purpose='donation' AND state='succeeded' AND target_type=4
         GROUP BY target_id
     ) article_donation 
       ON article.id = article_donation.target_id
     LEFT OUTER JOIN (
       SELECT reference_id, SUM(amount) AS num_appreciation
         FROM appreciation
-        WHERE purpose='appreciate'
+        WHERE created_at >= ${lastSeen} AND purpose='appreciate'
         GROUP BY reference_id
     ) article_appreciation 
        ON article.id = article_appreciation.reference_id
@@ -295,6 +295,8 @@ const loadArticles = async (
         FROM comment, article
         WHERE 
           comment.target_id=article.id
+          AND article.created_at >= ${lastSeen}
+          AND comment.created_at >= ${lastSeen}
           AND comment.author_id != article.author_id
           AND comment.type='article'
           AND comment.state='active'
