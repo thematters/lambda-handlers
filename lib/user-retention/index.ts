@@ -23,25 +23,24 @@ export const processUserRetention = async ({
   const intervalInMs = intervalInDays * 86400000;
   console.log({ intervalInMs });
 
-  const sendmails = [];
+  const sendmailJobs = [];
 
   console.time("loop");
-  const target = limit === undefined ? users : users.slice(0, limit);
-  for (const { userId, state, stateUpdatedAt, lastSeen } of target) {
+  for (const { userId, state, stateUpdatedAt, lastSeen } of users) {
     const stateDuration = +now - +stateUpdatedAt;
     if (lastSeen > stateUpdatedAt) {
       await markUserState(userId, "NORMAL");
     } else if (stateDuration > intervalInMs) {
       switch (state) {
         case "NEWUSER":
-          sendmails.push(
+          sendmailJobs.push(() =>
             sendmail(userId, lastSeen, "NEWUSER", async () =>
               markUserState(userId, "ALERT")
             )
           );
           break;
         case "ACTIVE":
-          sendmails.push(
+          sendmailJobs.push(() =>
             sendmail(userId, lastSeen, "ACTIVE", async () =>
               markUserState(userId, "ALERT")
             )
@@ -56,9 +55,10 @@ export const processUserRetention = async ({
   }
   console.timeEnd("loop");
 
-  console.log(`sendmails num: ${sendmails.length}`);
+  console.log(`original sendmails num: ${sendmailJobs.length}`);
   console.time("sendmails");
-  await Promise.all(sendmails);
+  const jobs = sendmailJobs.slice(0, limit);
+  await Promise.all(jobs.map((fn) => fn()));
   console.timeEnd("sendmails");
 };
 
