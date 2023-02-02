@@ -1,4 +1,4 @@
-import { sql } from "../../lib/db.js";
+import { sql, sqlRO } from "../db.js";
 import { sendmail } from "./sendmail.js";
 
 export const processUserRetention = async ({
@@ -135,7 +135,7 @@ const markActiveUsers = async () => {
 };
 
 const fetchUsersData = async () => {
-  return await sql`
+  return await sqlRO`
     WITH user_retention AS (
       SELECT ranked.user_id, ranked.state, ranked.created_at 
       FROM (

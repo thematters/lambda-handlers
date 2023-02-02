@@ -1,8 +1,8 @@
 import type { Language } from "../types";
 
-import { sql } from "../../lib/db.js";
-import { Mail } from "../../lib/mail.js";
-import { DAY, EMAIL_FROM_ASK } from "../../lib/constants/index.js";
+import { sqlRO as sql } from "../db.js";
+import { Mail } from "../mail.js";
+import { DAY, EMAIL_FROM_ASK } from "../constants/index.js";
 
 const siteDomain = process.env.MATTERS_SITE_DOMAIN || "";
 const newFeatureTagId = process.env.MATTERS_NEW_FEATURE_TAG_ID || "";

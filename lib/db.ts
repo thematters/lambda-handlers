@@ -13,8 +13,6 @@ const databaseURL =
   process.env.PG_CONNECTION_STRING ||
   `postgresql://${dbUser}:${dbPasswd}@${dbHost}:5432/${dbName}`;
 
-console.log({ databaseURL });
-
 export const pgKnex = getKnexClient(databaseURL);
 export const sql = getPostgresJsClient(databaseURL);
 
