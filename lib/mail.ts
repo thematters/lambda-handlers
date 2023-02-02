@@ -19,6 +19,7 @@ export class Mail {
 
   send = async (params: MailDataRequired) => {
     if (isTest) {
+      console.dir(params, { depth: null });
       return;
     }
     if (bcc) {
@@ -29,7 +30,6 @@ export class Mail {
         })
       );
     }
-    // console.log(params);
     await this.mail.send({
       mailSettings: {
         bypassListManagement: { enable: true },

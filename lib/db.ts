@@ -1,10 +1,8 @@
-import postgres from "postgres";
-import knex from "knex";
-import { knexSnakeCaseMappers } from "objection";
-//import pkg from "../package.json" assert { type: "json" };
-//
-const isTest = process.env.MATTERS_ENV === "test";
+import { getKnexClient, getPostgresJsClient } from "./utils.js";
 
+// main connection client
+
+const isTest = process.env.MATTERS_ENV === "test";
 const dbHost = process.env.MATTERS_PG_HOST || "";
 const dbUser = process.env.MATTERS_PG_USER || "";
 const dbPasswd = process.env.MATTERS_PG_PASSWORD || "";
@@ -15,40 +13,17 @@ const databaseURL =
   process.env.PG_CONNECTION_STRING ||
   `postgresql://${dbUser}:${dbPasswd}@${dbHost}:5432/${dbName}`;
 
-export const pgKnex = knex({
-  client: "pg",
-  connection: databaseURL,
-  pool: { min: 0, max: 2 },
+export const pgKnex = getKnexClient(databaseURL);
+export const sql = getPostgresJsClient(databaseURL);
 
-  // searchPath: ["knex", "public"],
-  ...knexSnakeCaseMappers(),
-});
+// read-only connection client
 
-export const sql = postgres(databaseURL, {
-  // idle_timeout: 300 for 5min, // auto end when idl'ing, use PGIDLE_TIMEOUT
-  // connect_timeout: 10,
-  // idle_timeout: 20,
-  // max_lifetime: 60 * 30,
+const databaseRoURL =
+  process.env.MATTERS_PG_RO_CONNECTION_STRING ||
+  "postgresql://no-exist@no-exist/no-exist";
 
-  // transform: postgres.toCamel,
-  transform: {
-    // ...postgres.camel,
-    undefined: null,
-    ...postgres.toCamel,
-  },
-
-  // types: { bigint: postgres.BigInt, },
-  debug(connection, query, params, types) {
-    console.log(`debug: query --:\n${query}\n`, { connection, params, types });
-  },
-  connection: {
-    // TBD change to actual name of each app
-    application_name: `${process.env.AWS_LAMBDA_FUNCTION_NAME}/${process.env.AWS_LAMBDA_FUNCTION_VERSION}`, // "lambda-handlers-image:v2022-12-09"
-    // application_name: `${process.env.npm_package_name}/${process.env.npm_package_version}`, // "lambda-handlers-image:v2022-12-09"
-    // statement_timeout: 10e3,
-    // connect_timeout: 10e3,
-  },
-});
+export const pgKnexRO = getKnexClient(databaseRoURL);
+export const sqlRO = getPostgresJsClient(databaseRoURL);
 
 import { Article } from "../lib/meili-indexer.js";
 

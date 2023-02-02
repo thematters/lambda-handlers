@@ -1,8 +1,8 @@
 import type { Language } from "../types";
 
-import { sql } from "../../lib/db.js";
-import { Mail } from "../../lib/mail.js";
-import { DAY, EMAIL_FROM_ASK } from "../../lib/constants/index.js";
+import { sqlRO as sql } from "../db.js";
+import { Mail } from "../mail.js";
+import { DAY, EMAIL_FROM_ASK } from "../constants/index.js";
 
 const siteDomain = process.env.MATTERS_SITE_DOMAIN || "";
 const newFeatureTagId = process.env.MATTERS_NEW_FEATURE_TAG_ID || "";
@@ -90,7 +90,7 @@ const loadUserInfo = async (userId: string): Promise<UserInfo> => {
   return res[0] as UserInfo;
 };
 
-const loadRecommendedArticles = async (
+export const loadRecommendedArticles = async (
   userId: string,
   lastSeen: Date,
   limit: number
@@ -272,6 +272,10 @@ const loadArticles = async (
     FROM article 
     INNER JOIN public.user u
       ON author_id = u.id
+        AND article.created_at >= ${lastSeen}
+        AND article.author_id IN (${targetAuthorIdFragment})
+        AND article.id NOT IN (SELECT article_id FROM article_read_count WHERE user_id=${userId})
+        AND article.id NOT IN ${excludedArticleIdsFragment}
     LEFT OUTER JOIN (
       SELECT target_id, COUNT(id) AS num_donations
         FROM transaction
@@ -299,15 +303,9 @@ const loadArticles = async (
     ) article_comment 
       ON article.id = article_comment.target_id
     WHERE 
-      article.created_at >= ${lastSeen}
-      AND article.author_id IN (${targetAuthorIdFragment})
-      AND article.id NOT IN (SELECT article_id FROM article_read_count WHERE user_id=${userId})
-      AND article.id NOT IN ${excludedArticleIdsFragment}
-      AND (
-        article_donation.num_donations >= 1
-        OR article_appreciation.num_appreciation >= 15
-        OR article_comment.num_comments >= 2
-      )
+      article_donation.num_donations >= 1
+      OR article_appreciation.num_appreciation >= 15
+      OR article_comment.num_comments >= 2
     ORDER BY
       article_donation.num_donations DESC NULLS LAST,
       article_appreciation.num_appreciation DESC NULLS LAST,
@@ -319,9 +317,3 @@ const getDays = (past: Date) => {
   const now = new Date();
   return Math.round(Math.abs((+now - +past) / DAY));
 };
-
-// const mediaHashToLink = (siteDomain: string, mediaHash: string) => `https://${siteDomain}/@-/-${mediaHash}`
-
-//sendmail("3685", new Date("2022-10-18"), "NEWUSER", async () => {
-//  process.exit();
-//});
