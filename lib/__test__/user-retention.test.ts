@@ -26,6 +26,9 @@ test("loadRecommendedArticles", async () => {
       mediaHash: "someIpfsMediaHash1",
     },
   ]);
+  // null lastSeen return nothing
+  const articles2 = await loadRecommendedArticles("2", null as any as Date, 3);
+  expect(articles2.length).toBe(0);
 });
 
 // helpers
