@@ -1,12 +1,6 @@
 import { sql } from "../db.js";
 import { markUserState } from "./utils.js";
 
-export type SendmailFn = (
-  userId: string,
-  lastSeen: Date | null,
-  type: "NEWUSER" | "ACTIVE"
-) => Promise<void>;
-
 export const processUserRetention = async ({
   intervalInDays,
   limit,

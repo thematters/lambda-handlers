@@ -1,9 +1,10 @@
 import type { Language } from "../types";
+import type { UserRetentionStateToMail } from "./types";
 
 import { sqlRO as sql } from "../db.js";
 import { Mail } from "../mail.js";
 import { DAY, EMAIL_FROM_ASK } from "../constants/index.js";
-import { markUserState } from "./utils.js";
+import { markUserState, loadUserRetentionState } from "./utils.js";
 
 const siteDomain = process.env.MATTERS_SITE_DOMAIN || "";
 const newFeatureTagId = process.env.MATTERS_NEW_FEATURE_TAG_ID || "";
@@ -14,9 +15,13 @@ const mail = new Mail();
 export const sendmail = async (
   userId: string,
   lastSeen: Date,
-  type: "NEWUSER" | "ACTIVE"
+  type: UserRetentionStateToMail
 ) => {
-  // TBD check user state first
+  const state = await loadUserRetentionState(userId);
+  if (state !== type) {
+    console.warn(`Unexpected user retention state: ${state},  sendmail quit.`);
+    return;
+  }
   const { displayName, email, language, createdAt } = await loadUserInfo(
     userId
   );
@@ -195,7 +200,7 @@ const loadNewFeatureArticles = async (
 
 const getSubject = (
   displayName: string,
-  type: "NEWUSER" | "ACTIVE",
+  type: UserRetentionStateToMail,
   language: Language
 ): string => {
   const subjects = {

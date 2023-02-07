@@ -1,4 +1,4 @@
-import type { SendmailFn } from "../lib/user-retention/index.js";
+import type { SendmailFn } from "../lib/user-retention/types";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { processUserRetention } from "../lib/user-retention/index.js";
 

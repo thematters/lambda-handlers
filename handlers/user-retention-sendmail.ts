@@ -14,9 +14,9 @@ import { sendmail } from "../lib/user-retention/sendmail.js";
 export const handler = async (event: SQSEvent) => {
   console.log(event);
   const results = await Promise.allSettled(
-    event.Records.map(({ body }: { body: string }) => {
+    event.Records.map(async ({ body }: { body: string }) => {
       const { userId, lastSeen, type } = JSON.parse(body);
-      sendmail(userId, lastSeen, type);
+      await sendmail(userId, lastSeen, type);
     })
   );
 

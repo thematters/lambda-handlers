@@ -1,6 +1,7 @@
-import { processUserRetention, SendmailFn } from "../user-retention";
+import type { SendmailFn } from "../user-retention/types";
+import { processUserRetention } from "../user-retention";
 import { loadRecommendedArticles } from "../user-retention/sendmail";
-import { markUserState } from "../user-retention/utils";
+import { markUserState, loadUserRetentionState } from "../user-retention/utils";
 import { DAY } from "../constants";
 import { sql } from "../db";
 
@@ -32,11 +33,23 @@ test("loadRecommendedArticles", async () => {
   expect(articles2.length).toBe(0);
 });
 
+test("loadUserRetentionState", async () => {
+  const userId = "3";
+  await clearUserRetentionHistory();
+  await markUserState(userId, "ALERT");
+  expect(await loadUserRetentionState(userId)).toBe("ALERT");
+  await markUserState(userId, "INACTIVE");
+  expect(await loadUserRetentionState(userId)).toBe("INACTIVE");
+});
+
 // helpers
 
 const mockSendmail: SendmailFn = async (userId, lastSeen, type) => {
-  markUserState(userId, "ALERT");
+  await markUserState(userId, "ALERT");
 };
 const getOldDate = () => new Date(+new Date() - DAY);
 const getUserRetentionHistory = (userId: string) =>
   sql`SELECT * FROM user_retention_history WHERE user_id=${userId};`;
+
+const clearUserRetentionHistory = () =>
+  sql`DELETE FROM user_retention_history;`;
