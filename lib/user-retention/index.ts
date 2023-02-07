@@ -1,16 +1,22 @@
 import { sql } from "../db.js";
-import { sendmail } from "./sendmail.js";
+import { markUserState } from "./utils.js";
+
+export type SendmailFn = (
+  userId: string,
+  lastSeen: Date | null,
+  type: "NEWUSER" | "ACTIVE"
+) => Promise<void>;
 
 export const processUserRetention = async ({
   intervalInDays,
   limit,
+  sendmail,
 }: {
   intervalInDays: number;
   limit?: number;
+  sendmail: any;
 }) => {
-  console.time("markNewUsers");
   await markNewUsers();
-  console.timeEnd("markNewUsers");
   await markActiveUsers();
 
   // fetch needed users data to check and change retention state
@@ -23,8 +29,6 @@ export const processUserRetention = async ({
   const intervalInMs = intervalInDays * 86400000;
   console.log({ intervalInMs });
 
-  const sendmailJobs = [];
-
   console.time("loop");
   for (const { userId, state, stateUpdatedAt, lastSeen } of users) {
     const stateDuration = +now - +stateUpdatedAt;
@@ -33,18 +37,10 @@ export const processUserRetention = async ({
     } else if (stateDuration > intervalInMs) {
       switch (state) {
         case "NEWUSER":
-          sendmailJobs.push(() =>
-            sendmail(userId, lastSeen, "NEWUSER", async () =>
-              markUserState(userId, "ALERT")
-            )
-          );
+          await sendmail(userId, lastSeen, "NEWUSER");
           break;
         case "ACTIVE":
-          sendmailJobs.push(() =>
-            sendmail(userId, lastSeen, "ACTIVE", async () =>
-              markUserState(userId, "ALERT")
-            )
-          );
+          await sendmail(userId, lastSeen, "ACTIVE");
           break;
         case "ALERT":
           await markUserState(userId, "INACTIVE");
@@ -54,28 +50,17 @@ export const processUserRetention = async ({
     // else stateDuration < intervalInMs , do nothing
   }
   console.timeEnd("loop");
-
-  console.log(`original sendmails num: ${sendmailJobs.length}`);
-  console.time("sendmails");
-  const jobs = sendmailJobs.slice(0, limit);
-  await Promise.all(jobs.map((fn) => fn()));
-  console.timeEnd("sendmails");
-};
-
-const markUserState = async (
-  userId: string,
-  state: "NORMAL" | "ALERT" | "INACTIVE"
-) => {
-  await sql`INSERT INTO user_retention_history (user_id, state) VALUES (${userId}, ${state});`;
 };
 
 const markNewUsers = async () => {
+  console.time("markNewUsers");
   await sql`
     INSERT INTO user_retention_history (user_id, state) 
     SELECT id, 'NEWUSER' FROM public.user 
     WHERE 
       created_at >= (CURRENT_TIMESTAMP - '2 day'::interval)
       AND id NOT IN (SELECT user_id FROM user_retention_history);`;
+  console.timeEnd("markNewUsers");
 };
 
 const markActiveUsers = async () => {

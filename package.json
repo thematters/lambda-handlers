@@ -29,6 +29,7 @@
     "uuid": "^9.0.0"
   },
   "dependencies": {
+    "@aws-sdk/client-sqs": "^3.266.0",
     "@matters/apollo-response-cache": "^1.4.0-rc.0",
     "@matters/ipns-site-generator": "^0.1.0",
     "@sendgrid/helpers": "^7.7.0",

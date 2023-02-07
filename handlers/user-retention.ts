@@ -1,20 +1,35 @@
-import { Mail } from "../lib/mail.js";
+import type { SendmailFn } from "../lib/user-retention/index.js";
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { processUserRetention } from "../lib/user-retention/index.js";
 
-// envs need to provide:
-// PG_CONNECTION_STRING
-// PGPASSWORD
-// MATTERS_SENDGRID_API_KEY
-// MATTERS_SITE_DOMAIN
-// MATTERS_NEW_FEATURE_TAG_ID;
+// envs
 // MATTERS_USER_RETENTION_INTERVAL_IN_DAYS
+// MATTERS_USER_RETENTION_SENDMAIL_QUEUE_URL
+// MATTERS_PG_HOST
+// MATTERS_PG_USER
+// MATTERS_PG_PASSWORD
+// MATTERS_PG_DATABASE
+// MATTERS_PG_RO_CONNECTION_STRING
 
 const intervalInDays =
   parseFloat(process.env.MATTERS_USER_RETENTION_INTERVAL_IN_DAYS as string) ||
   6;
+const queueUrl = process.env.MATTERS_USER_RETENTION_SENDMAIL_QUEUE_URL || "";
 
 export const handler = async (event: any) => {
-  // console.log({ env: process.env });
   const limit = event.limit;
-  await processUserRetention({ intervalInDays, limit });
+  const client = new SQSClient({ region: process.env.AWS_REGIONAWS_REGION });
+  const sendmail: SendmailFn = async (userId, lastSeen, type) => {
+    try {
+      await client.send(
+        new SendMessageCommand({
+          QueueUrl: queueUrl,
+          MessageBody: JSON.stringify({ userId, lastSeen, type }),
+        })
+      );
+    } catch (error) {
+      console.error(error);
+    }
+  };
+  await processUserRetention({ intervalInDays, limit, sendmail });
 };

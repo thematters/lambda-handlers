@@ -3,6 +3,7 @@ import type { Language } from "../types";
 import { sqlRO as sql } from "../db.js";
 import { Mail } from "../mail.js";
 import { DAY, EMAIL_FROM_ASK } from "../constants/index.js";
+import { markUserState } from "./utils.js";
 
 const siteDomain = process.env.MATTERS_SITE_DOMAIN || "";
 const newFeatureTagId = process.env.MATTERS_NEW_FEATURE_TAG_ID || "";
@@ -13,9 +14,9 @@ const mail = new Mail();
 export const sendmail = async (
   userId: string,
   lastSeen: Date,
-  type: "NEWUSER" | "ACTIVE",
-  callback: () => Promise<void>
+  type: "NEWUSER" | "ACTIVE"
 ) => {
+  // TBD check user state first
   const { displayName, email, language, createdAt } = await loadUserInfo(
     userId
   );
@@ -59,7 +60,7 @@ export const sendmail = async (
       },
     ],
   });
-  await callback();
+  await markUserState(userId, "ALERT");
 };
 
 // helpers
