@@ -34,26 +34,23 @@ export const sendmail = async (
   }
   const subject = getSubject(displayName, type, language);
   const recipient = { displayName, days: getDays(createdAt) };
-  const [
-    numDonations,
-    numAppreciations,
-    usersRecommended,
-    articlesNewFeature,
-  ] = await Promise.all([
-    loadNumDonations(userId),
-    loadNumAppreciations(userId),
-    loadRecommendedUsers(userId, 3),
-    loadNewFeatureArticles(newFeatureTagId, 1),
-  ]);
-  const excludeNewFeatureArticlesIds = articlesNewFeature.map(({ id }) => id)
-  const articlesRecommended = await loadRecommendedArticles(userId, lastSeen, 3, excludeNewFeatureArticlesIds)
+  const [numDonations, numAppreciations, usersRecommended, articlesNewFeature] =
+    await Promise.all([
+      loadNumDonations(userId),
+      loadNumAppreciations(userId),
+      loadRecommendedUsers(userId, 3),
+      loadNewFeatureArticles(newFeatureTagId, 1),
+    ]);
+  const excludeNewFeatureArticlesIds = articlesNewFeature.map(({ id }) => id);
+  const articlesRecommended = await loadRecommendedArticles(
+    userId,
+    lastSeen,
+    3,
+    excludeNewFeatureArticlesIds
+  );
   const articlesHottest =
     articlesRecommended.length === 0
-      ? await loadHottestArticles(
-          userId,
-          3,
-          sql(excludeNewFeatureArticlesIds)
-        )
+      ? await loadHottestArticles(userId, 3, sql(excludeNewFeatureArticlesIds))
       : [];
   await mail.send({
     from: EMAIL_FROM_ASK,
@@ -114,7 +111,12 @@ export const loadRecommendedArticles = async (
   limit: number,
   excludedArticleIds: string[]
 ) => {
-  const articles = await loadDoneeHotArticles(userId, lastSeen, limit, excludedArticleIds);
+  const articles = await loadDoneeHotArticles(
+    userId,
+    lastSeen,
+    limit,
+    excludedArticleIds
+  );
   if (articles.length < limit) {
     return articles.concat(
       await loadFolloweeHotArticles(
@@ -268,7 +270,7 @@ const loadFolloweeHotArticles = async (
   userId: string,
   lastSeen: Date,
   limit: number,
-  excludedArticleIds: string[],
+  excludedArticleIds: string[]
 ): Promise<Article[]> => {
   return loadArticles(
     userId,
