@@ -35,24 +35,24 @@ export const sendmail = async (
   const subject = getSubject(displayName, type, language);
   const recipient = { displayName, days: getDays(createdAt) };
   const [
-    articlesRecommended,
     numDonations,
     numAppreciations,
     usersRecommended,
     articlesNewFeature,
   ] = await Promise.all([
-    loadRecommendedArticles(userId, lastSeen, 3),
     loadNumDonations(userId),
     loadNumAppreciations(userId),
     loadRecommendedUsers(userId, 3),
     loadNewFeatureArticles(newFeatureTagId, 1),
   ]);
+  const excludeNewFeatureArticlesIds = articlesNewFeature.map(({ id }) => id)
+  const articlesRecommended = await loadRecommendedArticles(userId, lastSeen, 3, excludeNewFeatureArticlesIds)
   const articlesHottest =
     articlesRecommended.length === 0
       ? await loadHottestArticles(
           userId,
           3,
-          sql(articlesNewFeature.map(({ id }) => id))
+          sql(excludeNewFeatureArticlesIds)
         )
       : [];
   await mail.send({
@@ -111,16 +111,17 @@ const loadUserInfo = async (userId: string): Promise<UserInfo> => {
 export const loadRecommendedArticles = async (
   userId: string,
   lastSeen: Date,
-  limit: number
+  limit: number,
+  excludedArticleIds: string[]
 ) => {
-  const articles = await loadDoneeHotArticles(userId, lastSeen, limit);
+  const articles = await loadDoneeHotArticles(userId, lastSeen, limit, excludedArticleIds);
   if (articles.length < limit) {
     return articles.concat(
       await loadFolloweeHotArticles(
         userId,
         lastSeen,
         limit - articles.length,
-        articles.map(({ id }) => id)
+        excludedArticleIds.concat(articles.map(({ id }) => id))
       )
     );
   } else {
@@ -251,7 +252,8 @@ const getTemplateId = (language: Language): string => {
 const loadDoneeHotArticles = async (
   userId: string,
   lastSeen: Date,
-  limit: number
+  limit: number,
+  excludedArticleIdsFragment: any
 ): Promise<Article[]> => {
   return loadArticles(
     userId,
@@ -266,7 +268,7 @@ const loadFolloweeHotArticles = async (
   userId: string,
   lastSeen: Date,
   limit: number,
-  excludedArticleIds: string[]
+  excludedArticleIds: string[],
 ): Promise<Article[]> => {
   return loadArticles(
     userId,
