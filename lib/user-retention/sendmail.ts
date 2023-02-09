@@ -27,7 +27,8 @@ export const sendmail = async (
   const { displayName, email, language, createdAt, state } = await loadUserInfo(
     userId
   );
-  if (!(state in ["onboarding", "active"])) {
+  const goodState = ["onboarding", "active"];
+  if (!goodState.includes(state)) {
     console.warn(`Unexpected user state: ${state},  sendmail quit.`);
     return;
   }
