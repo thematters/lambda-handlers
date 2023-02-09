@@ -3,11 +3,9 @@ import { markUserState } from "./utils.js";
 
 export const processUserRetention = async ({
   intervalInDays,
-  limit,
   sendmail,
 }: {
   intervalInDays: number;
-  limit?: number;
   sendmail: any;
 }) => {
   await markNewUsers();

@@ -17,7 +17,6 @@ const intervalInDays =
 const queueUrl = process.env.MATTERS_USER_RETENTION_SENDMAIL_QUEUE_URL || "";
 
 export const handler = async (event: any) => {
-  const limit = event.limit;
   const client = new SQSClient({ region: process.env.AWS_REGIONAWS_REGION });
   const sendmail: SendmailFn = async (userId, lastSeen, type) => {
     try {
@@ -31,5 +30,6 @@ export const handler = async (event: any) => {
       console.error(error);
     }
   };
-  await processUserRetention({ intervalInDays, limit, sendmail });
+
+  await processUserRetention({ intervalInDays, sendmail });
 };
