@@ -19,7 +19,7 @@ test("processUserRetention", async () => {
 });
 
 test("loadRecommendedArticles", async () => {
-  const articles = await loadRecommendedArticles("2", getOldDate(), 3);
+  const articles = await loadRecommendedArticles("2", getOldDate(), 3, ["0"]);
   expect(articles).toEqual([
     {
       id: "1",
@@ -29,7 +29,9 @@ test("loadRecommendedArticles", async () => {
     },
   ]);
   // null lastSeen return nothing
-  const articles2 = await loadRecommendedArticles("2", null as any as Date, 3);
+  const articles2 = await loadRecommendedArticles("2", null as any as Date, 3, [
+    "0",
+  ]);
   expect(articles2.length).toBe(0);
 });
 
