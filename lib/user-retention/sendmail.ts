@@ -51,7 +51,7 @@ export const sendmail = async (
       ? await loadHottestArticles(
           userId,
           3,
-          sql(articlesRecommended.map((a) => a.id))
+          sql(articlesNewFeature.map(({ id }) => id))
         )
       : [];
   await mail.send({
