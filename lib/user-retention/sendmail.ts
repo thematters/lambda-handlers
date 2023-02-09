@@ -17,14 +17,20 @@ export const sendmail = async (
   lastSeen: Date,
   type: UserRetentionStateToMail
 ) => {
-  const state = await loadUserRetentionState(userId);
-  if (state !== type) {
-    console.warn(`Unexpected user retention state: ${state},  sendmail quit.`);
+  const retentionState = await loadUserRetentionState(userId);
+  if (retentionState !== type) {
+    console.warn(
+      `Unexpected user retention state: ${retentionState},  sendmail quit.`
+    );
     return;
   }
-  const { displayName, email, language, createdAt } = await loadUserInfo(
+  const { displayName, email, language, createdAt, state } = await loadUserInfo(
     userId
   );
+  if (!(state in ["onboarding", "active"])) {
+    console.warn(`Unexpected user state: ${state},  sendmail quit.`);
+    return;
+  }
   const subject = getSubject(displayName, type, language);
   const recipient = { displayName, days: getDays(createdAt) };
   const [
@@ -42,7 +48,11 @@ export const sendmail = async (
   ]);
   const articlesHottest =
     articlesRecommended.length === 0
-      ? await loadHottestArticles(userId, 3)
+      ? await loadHottestArticles(
+          userId,
+          3,
+          sql(articlesRecommended.map((a) => a.id))
+        )
       : [];
   await mail.send({
     from: EMAIL_FROM_ASK,
@@ -75,6 +85,7 @@ type UserInfo = {
   email: string;
   language: Language;
   createdAt: Date;
+  state: string;
 };
 
 type User = {
@@ -92,7 +103,7 @@ type Article = {
 
 const loadUserInfo = async (userId: string): Promise<UserInfo> => {
   const res =
-    await sql`select display_name, email, language, created_at from public.user where id=${userId}`;
+    await sql`select display_name, email, language, created_at, state from public.user where id=${userId}`;
   return res[0] as UserInfo;
 };
 
@@ -118,13 +129,15 @@ export const loadRecommendedArticles = async (
 
 const loadHottestArticles = async (
   userId: string,
-  limit: number
+  limit: number,
+  excludedArticleIdsFragment: any
 ): Promise<Article[]> => sql`
     SELECT h.id, h.title, u.display_name, a.media_hash
     FROM article_hottest_materialized h 
     JOIN article a ON h.id = a.id
     JOIN public.user u ON a.author_id=u.id
-    WHERE h.id NOT IN (SELECT article_id FROM article_read_count WHERE user_id=${userId}) AND a.author_id != ${userId}
+    WHERE a.id NOT IN (SELECT article_id FROM article_read_count WHERE user_id=${userId}) AND a.author_id != ${userId}
+        AND a.id NOT IN ${excludedArticleIdsFragment}
     ORDER BY h.score DESC
     LIMIT ${limit};
 `;
