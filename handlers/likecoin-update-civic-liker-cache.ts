@@ -7,6 +7,10 @@ import { LikeCoin } from "../lib/likecoin.js";
 // MATTERS_LIKECOIN_CLIENT_SECRET
 // MATTERS_CACHE_HOST
 // MATTERS_CACHE_PORT
+// MATTERS_PG_HOST
+// MATTERS_PG_USER
+// MATTERS_PG_PASSWORD
+// MATTERS_PG_DATABASE
 
 const likecoin = new LikeCoin();
 
