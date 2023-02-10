@@ -205,3 +205,35 @@ jobs:
         env:
           IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
 
+  ### User Likecoin
+  deploy-likecoin-like-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Likecoin Like Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name likecoin-like-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-likecoin-update-civic-liker-cache-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Likecoin likecoin-update-civic-liker-cache Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name likecoin-update-civic-liker-cache-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
