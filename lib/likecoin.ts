@@ -205,12 +205,21 @@ export class LikeCoin {
   };
 
   private requestIsCivicLiker = async ({ likerId }: { likerId: string }) => {
-    const res = await this.request({
-      endpoint: `/users/id/${likerId}/min`,
-      method: "GET",
-      timeout: 2000,
-      // liker,
-    });
+    let res: any;
+    try {
+      res = await this.request({
+        endpoint: `/users/id/${likerId}/min`,
+        method: "GET",
+        timeout: 2000,
+      });
+    } catch (e: any) {
+      const code = e.response?.status as any;
+      if (code === 404) {
+        console.warn(`likerId ${likerId} not exsit`);
+        return false;
+      }
+      throw e;
+    }
     return !!res?.data?.isSubscribedCivicLiker;
   };
 
@@ -326,13 +335,7 @@ export class LikeCoin {
     this.knex.select().from("user_oauth_likecoin").where({ likerId }).first();
 }
 
-// const likecoin = new LikeCoin();
-// likecoin.like({
-//   likerId: "bob_at_dev",
-//   likerIp: "20.42.13.51",
-//   userAgent:
-//     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:108.0.2) Gecko/20100101 Firefox/108.0.2",
-//   authorLikerId: "alice_at_dev",
-//   url: "https://web-develop.matters.news/@alice_at_dev/do-laboris-sint-veniam-qui-bafybeiatopxpdcrdgyrwbdryx6kj6k6enp6awbxdw3gfhroh2suskxdhve",
-//   amount: 2,
-// });
+//const likecoin = new LikeCoin();
+//(likecoin as any).requestIsCivicLiker({
+//  likerId: "chiao22",
+//});
