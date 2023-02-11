@@ -1,5 +1,5 @@
 import { invalidateFQC } from "@matters/apollo-response-cache";
-import axios, { AxiosRequestConfig, AxiosHeaders } from "axios";
+import axios from "axios";
 import { Knex } from "knex";
 
 import { pgKnex } from "./db.js";
@@ -17,12 +17,13 @@ type UserOAuthLikeCoinAccountType = "temporal" | "general";
 
 type RequestProps = {
   endpoint: string;
-  headers?: { [key: string]: any };
+  method: "GET" | "POST";
   liker?: UserOAuthLikeCoin;
-  withClientCredential?: boolean;
+  data?: any;
   ip?: string;
   userAgent?: string;
-} & AxiosRequestConfig;
+  timeout?: number;
+};
 
 interface UserOAuthLikeCoin {
   likerId: string;
@@ -155,7 +156,6 @@ export class LikeCoin {
       ip: likerIp,
       userAgent,
       endpoint,
-      withClientCredential: true,
       method: "POST",
       liker,
       data: {
@@ -193,8 +193,7 @@ export class LikeCoin {
       liker,
       ip: likerIp,
       userAgent,
-      withClientCredential: true,
-      params: {
+      data: {
         referrer: encodeURI(url),
       },
     });
@@ -218,52 +217,46 @@ export class LikeCoin {
   };
 
   private request = async ({
+    method,
     endpoint,
     liker,
-    withClientCredential,
+    data,
     ip,
     userAgent,
-    headers = {},
-    ...axiosOptions
+    timeout,
   }: RequestProps) => {
     let accessToken = liker?.accessToken;
     const makeRequest = () => {
       // Headers
+      const headers = {} as any;
       if (accessToken) {
-        (headers as AxiosHeaders).set("Authorization", `Bearer ${accessToken}`);
+        headers["Authorization"] = `Bearer ${accessToken}`;
       }
       if (ip) {
-        (headers as AxiosHeaders).set("X-LIKECOIN-REAL-IP", ip);
+        headers["X-LIKECOIN-REAL-IP"] = ip;
       }
       if (userAgent) {
-        (headers as AxiosHeaders).set("X-LIKECOIN-USER-AGENT", userAgent);
+        headers["X-LIKECOIN-USER-AGENT"] = userAgent;
       }
 
-      // Params
-      let params = {};
-      if (withClientCredential) {
-        if (axiosOptions.method === "GET") {
-          params = {
-            ...params,
-            client_id: likecoinClientId,
-            client_secret: likecoinClientSecret,
-          };
-        } else if (axiosOptions.data) {
-          axiosOptions.data = {
-            ...axiosOptions.data,
-            client_id: likecoinClientId,
-            client_secret: likecoinClientSecret,
-          };
-        }
-      }
-
-      return axios({
-        url: endpoint,
+      data = {
+        ...data,
+        client_id: likecoinClientId,
+        client_secret: likecoinClientSecret,
+      };
+      const instance = axios.create({
         baseURL: likecoinApiURL,
-        params,
         headers,
-        ...axiosOptions,
+        timeout,
       });
+
+      if (method === "GET") {
+        return instance.get(endpoint, {
+          params: data,
+        });
+      } else {
+        return instance.post(endpoint, { data });
+      }
     };
 
     let retries = 0;
@@ -309,7 +302,6 @@ export class LikeCoin {
   }): Promise<string> => {
     const res = await this.request({
       endpoint: ENDPOINT.acccessToken,
-      withClientCredential: true,
       method: "POST",
       data: {
         grant_type: "refresh_token",
