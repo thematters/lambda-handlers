@@ -65,8 +65,6 @@ const ENDPOINT = {
 
 const ERROR_CODE = {
   TOKEN_EXPIRED: "TOKEN_EXPIRED",
-  EMAIL_ALREADY_USED: "EMAIL_ALREADY_USED",
-  OAUTH_USER_ID_ALREADY_USED: "OAUTH_USER_ID_ALREADY_USED",
   LOGIN_NEEDED: "LOGIN_NEEDED",
   INSUFFICIENT_PERMISSION: "INSUFFICIENT_PERMISSION",
 };
@@ -255,7 +253,7 @@ export class LikeCoin {
           params: data,
         });
       } else {
-        return instance.post(endpoint, { data });
+        return instance.post(endpoint, data);
       }
     };
 
@@ -276,11 +274,6 @@ export class LikeCoin {
             }
             break;
 
-          case ERROR_CODE.EMAIL_ALREADY_USED:
-            throw new Error("email already used.");
-          case ERROR_CODE.OAUTH_USER_ID_ALREADY_USED:
-            throw new Error("user id already used.");
-
           // notify client to prompt the user for reauthentication.
           // case ERROR_CODE.LOGIN_NEEDED: // was not re-trying
           case ERROR_CODE.INSUFFICIENT_PERMISSION:
@@ -288,8 +281,6 @@ export class LikeCoin {
               "token has no permission to access the resource, please reauth."
             );
         }
-
-        console.error(e);
         throw e;
       }
     }
@@ -334,3 +325,14 @@ export class LikeCoin {
   }): Promise<UserOAuthLikeCoin | null> =>
     this.knex.select().from("user_oauth_likecoin").where({ likerId }).first();
 }
+
+// const likecoin = new LikeCoin();
+// likecoin.like({
+//   likerId: "bob_at_dev",
+//   likerIp: "20.42.13.51",
+//   userAgent:
+//     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:108.0.2) Gecko/20100101 Firefox/108.0.2",
+//   authorLikerId: "alice_at_dev",
+//   url: "https://web-develop.matters.news/@alice_at_dev/do-laboris-sint-veniam-qui-bafybeiatopxpdcrdgyrwbdryx6kj6k6enp6awbxdw3gfhroh2suskxdhve",
+//   amount: 2,
+// });
