@@ -1,11 +1,11 @@
 import { pgKnex as knex } from "../db.js";
 import { s3DeleteFile } from "../utils.js";
-import { ASSET_TYPE } from "./enum.js";
+import { ASSET_TYPE, PUBLISH_STATE } from "./enum.js";
 
 const draftEntityTypeId = process.env.MATTERS_DRAFT_ENTITY_TYPE_ID || '';
 const s3Bucket = process.env.MATTERS_AWS_S3_BUCKET || ''
 
-export const archiveUser = (userId: string) => {
+export const archiveUser = async (userId: string) => {
   // delete unlinked drafts
   await deleteUnpublishedDrafts(userId);
 
@@ -15,7 +15,7 @@ export const archiveUser = (userId: string) => {
 
 // helpers
 
-const deleteUnpublishedDrafts = (userId: string) => {
+const deleteUnpublishedDrafts = async (authorId: string) => {
   const drafts = await findUnpublishedByAuthor(authorId);
 
   // delete assets
@@ -41,7 +41,7 @@ const deleteUnpublishedDrafts = (userId: string) => {
   await deleteDrafts(drafts.map((draft) => draft.id));
 };
 
-const deleteUserAssets = (userId: string) => {
+const deleteUserAssets = async (userId: string) => {
   const types = [
     ASSET_TYPE.avatar,
     ASSET_TYPE.profileCover,
@@ -93,7 +93,7 @@ const deleteAssetAndAssetMap = async (assetPaths: { [id: string]: string }) => {
   try {
     await Promise.all(paths.map((path) => s3DeleteFile(s3Bucket, path)));
   } catch (e) {
-    logger.error(e);
+    console.error(e);
   }
 };
 

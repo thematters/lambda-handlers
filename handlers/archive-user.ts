@@ -1,5 +1,5 @@
 import { SQSEvent } from "aws-lambda";
-import { archiveUser } from "../lib/archive-user.js";
+import { archiveUser } from "../lib/archive-user/index.js";
 
 // envs
 // MATTERS_DRAFT_ENTITY_TYPE_ID

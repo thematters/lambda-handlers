@@ -13,3 +13,10 @@ export const ASSET_TYPE = {
 
   imgCached: "img-cached",
 };
+
+export const PUBLISH_STATE = {
+  unpublished: 'unpublished',
+  pending: 'pending',
+  error: 'error',
+  published: 'published',
+}
