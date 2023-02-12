@@ -1,6 +1,9 @@
 import postgres from "postgres";
 import knex from "knex";
 import { knexSnakeCaseMappers } from "objection";
+import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+
+// Database
 
 const baseApplicationName = `${process.env.AWS_LAMBDA_FUNCTION_NAME}/${process.env.AWS_LAMBDA_FUNCTION_VERSION}`;
 
@@ -43,3 +46,14 @@ export const getPostgresJsClient = (connectionString: string) =>
       // connect_timeout: 10e3,
     },
   });
+
+// AWS
+const s3 = new S3Client({ region: process.env.AWS_REGIONAWS_REGION });
+
+export const s3DeleteFile = async (bucket: string, key: string) =>
+  s3.send(
+    new DeleteObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    })
+  );
