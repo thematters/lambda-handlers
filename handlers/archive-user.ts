@@ -3,6 +3,8 @@ import { archiveUser } from "../lib/archive-user/index.js";
 
 // envs
 // MATTERS_AWS_S3_BUCKET
+// MATTERS_CLOUDFLARE_ACCOUNT_ID
+// MATTERS_CLOUDFLARE_API_TOKEN
 // MATTERS_PG_HOST
 // MATTERS_PG_USER
 // MATTERS_PG_PASSWORD
