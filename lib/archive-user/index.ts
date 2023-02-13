@@ -1,11 +1,16 @@
 import { pgKnex as knex } from "../db.js";
 import { s3DeleteFile } from "../utils.js";
-import { ASSET_TYPE, PUBLISH_STATE } from "./enum.js";
+import { ARTICLE_STATE } from "../constants/index.js";
+import { ASSET_TYPE, PUBLISH_STATE, USER_STATE } from "./enum.js";
 
-const draftEntityTypeId = process.env.MATTERS_DRAFT_ENTITY_TYPE_ID || '';
-const s3Bucket = process.env.MATTERS_AWS_S3_BUCKET || ''
+const s3Bucket = process.env.MATTERS_AWS_S3_BUCKET || "";
 
 export const archiveUser = async (userId: string) => {
+  const state = await getUserState(userId);
+  if (state !== USER_STATE.archived) {
+    console.warn(`Unexpected user state: ${state} for user ${userId}`);
+    return;
+  }
   // delete unlinked drafts
   await deleteUnpublishedDrafts(userId);
 
@@ -18,6 +23,7 @@ export const archiveUser = async (userId: string) => {
 const deleteUnpublishedDrafts = async (authorId: string) => {
   const drafts = await findUnpublishedByAuthor(authorId);
 
+  const draftEntityTypeId = await getDraftEntityTypeId();
   // delete assets
   await Promise.all(
     drafts.map(async (draft) => {
@@ -37,8 +43,16 @@ const deleteUnpublishedDrafts = async (authorId: string) => {
     })
   );
 
+  // delete error articles
+  await deleteErrorArticles(drafts.map((draft) => draft.articleId));
+
   // delete drafts
   await deleteDrafts(drafts.map((draft) => draft.id));
+};
+
+const getUserState = async (userId: string) => {
+  const res = await knex("user").where("id", userId).first();
+  return res.state;
 };
 
 const deleteUserAssets = async (userId: string) => {
@@ -61,10 +75,17 @@ const deleteUserAssets = async (userId: string) => {
   }
 };
 
+const getDraftEntityTypeId = async () => {
+  const res = await knex("entity_type")
+    .select("id")
+    .where({ table: "draft" })
+    .first();
+  return res.id;
+};
+
 const findUnpublishedByAuthor = (authorId: string) =>
-  knex()
+  knex("draft")
     .select()
-    .from("draft")
     .where({ authorId, archived: false })
     .andWhereNot({ publishState: PUBLISH_STATE.published })
     .orderBy("updated_at", "desc");
@@ -96,6 +117,9 @@ const deleteAssetAndAssetMap = async (assetPaths: { [id: string]: string }) => {
     console.error(e);
   }
 };
+
+const deleteErrorArticles = async (ids: string[]) =>
+  knex("article").whereIn("id", ids).where("state", ARTICLE_STATE.error).del();
 
 const deleteDrafts = async (ids: string[]) =>
   knex("draft").whereIn("id", ids).del();

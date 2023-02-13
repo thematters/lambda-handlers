@@ -2,7 +2,6 @@ import { SQSEvent } from "aws-lambda";
 import { archiveUser } from "../lib/archive-user/index.js";
 
 // envs
-// MATTERS_DRAFT_ENTITY_TYPE_ID
 // MATTERS_AWS_S3_BUCKET
 // MATTERS_PG_HOST
 // MATTERS_PG_USER
@@ -13,10 +12,9 @@ export const handler = async (event: SQSEvent) => {
   console.log(event.Records);
   const results = await Promise.allSettled(
     event.Records.map(async ({ body }: { body: string }) => {
-      const {userId} = JSON.parse(body)
-      await archiveUser(userId)
-    }
-    )
+      const { userId } = JSON.parse(body);
+      await archiveUser(userId);
+    })
   );
   // print failed reseaon
   results.map((res) => {

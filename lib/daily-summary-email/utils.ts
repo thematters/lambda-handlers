@@ -2,9 +2,9 @@ import { Base64 } from "js-base64";
 import { makeSummary } from "@matters/ipns-site-generator";
 
 import { sql, pgKnex } from "../../lib/db.js";
+import { ARTICLE_STATE } from "../constants/index.js";
 import {
   APPRECIATION_PURPOSE,
-  ARTICLE_STATE,
   COMMENT_STATE,
   COMMENT_TYPE,
   NODE_TYPE,
