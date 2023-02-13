@@ -105,7 +105,6 @@ const deleteAssetAndAssetMap = async (assetPaths: { [id: string]: string }) => {
   });
 
   const logError = (err: Error) => {
-    // logger.error(err)
     console.error("delete assets ERROR:", err);
   };
 
