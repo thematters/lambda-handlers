@@ -1,7 +1,7 @@
-import { pgKnex as knex } from "../db.js";
+import { pgKnex as knex } from "./db.js";
 
 export const refreshView = async (view: string) => {
-  if (!Object.values(MATERIALIZED_VIEW).includes(view)) {
+  if (!Object.values(MATERIALIZED_VIEW).includes(view as any)) {
     throw Error(`Unexpected view name: ${view}`);
   }
   await knex.raw(/*sql*/ `
