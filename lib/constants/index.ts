@@ -9,3 +9,18 @@ export const ARTICLE_STATE = {
   pending: "pending",
   error: "error",
 };
+
+export const PUBLISH_STATE = {
+  unpublished: "unpublished",
+  pending: "pending",
+  error: "error",
+  published: "published",
+};
+
+export const USER_STATE = {
+  frozen: "frozen",
+  onboarding: "onboarding",
+  active: "active",
+  banned: "banned",
+  archived: "archived",
+};

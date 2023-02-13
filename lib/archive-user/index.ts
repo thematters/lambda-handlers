@@ -1,7 +1,11 @@
 import { pgKnex as knex } from "../db.js";
 import { s3DeleteFile } from "../utils.js";
-import { ARTICLE_STATE } from "../constants/index.js";
-import { ASSET_TYPE, PUBLISH_STATE, USER_STATE } from "./enum.js";
+import {
+  ARTICLE_STATE,
+  PUBLISH_STATE,
+  USER_STATE,
+} from "../constants/index.js";
+import { ASSET_TYPE } from "./enum.js";
 
 const s3Bucket = process.env.MATTERS_AWS_S3_BUCKET || "";
 
@@ -22,6 +26,7 @@ export const archiveUser = async (userId: string) => {
 
 const deleteUnpublishedDrafts = async (authorId: string) => {
   const drafts = await findUnpublishedByAuthor(authorId);
+  console.log(drafts);
 
   const draftEntityTypeId = await getDraftEntityTypeId();
   // delete assets
@@ -43,9 +48,10 @@ const deleteUnpublishedDrafts = async (authorId: string) => {
     })
   );
 
-  // delete error articles
-  await deleteErrorArticles(drafts.map((draft) => draft.articleId));
-
+  // update draft.article_id to null
+  await unlinkUnpublishedDrafts(drafts.map((draft) => draft.id));
+  // delete not active articles
+  await deleteUnpulishedArticles(drafts.map((draft) => draft.articleId));
   // delete drafts
   await deleteDrafts(drafts.map((draft) => draft.id));
 };
@@ -118,8 +124,14 @@ const deleteAssetAndAssetMap = async (assetPaths: { [id: string]: string }) => {
   }
 };
 
-const deleteErrorArticles = async (ids: string[]) =>
-  knex("article").whereIn("id", ids).where("state", ARTICLE_STATE.error).del();
+const unlinkUnpublishedDrafts = async (ids: string[]) =>
+  knex("draft").whereIn("id", ids).update("article_id", null);
+
+const deleteUnpulishedArticles = async (ids: string[]) =>
+  knex("article")
+    .whereIn("id", ids)
+    .andWhereNot("state", ARTICLE_STATE.active)
+    .del();
 
 const deleteDrafts = async (ids: string[]) =>
   knex("draft").whereIn("id", ids).del();
