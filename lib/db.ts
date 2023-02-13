@@ -1,4 +1,4 @@
-import { getKnexClient, getPostgresJsClient } from "./utils.js";
+import { getKnexClient, getPostgresJsClient } from "./utils/db.js";
 
 // main connection client
 

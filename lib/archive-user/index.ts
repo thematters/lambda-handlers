@@ -1,12 +1,10 @@
-import {
-  USER_STATE,
-} from "../constants/index.js";
+import { USER_STATE } from "../constants/index.js";
 
 import {
-  getUserState, 
+  getUserState,
   deleteUnpublishedDrafts,
-  deleteUserAssets
-} from './utils.js'
+  deleteUserAssets,
+} from "./utils.js";
 
 export const archiveUser = async (userId: string) => {
   const state = await getUserState(userId);
