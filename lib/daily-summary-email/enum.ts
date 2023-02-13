@@ -67,12 +67,6 @@ export const APPRECIATION_PURPOSE = {
   systemSubsidy: "system-subsidy",
 };
 
-export const ARTICLE_STATE = {
-  active: "active",
-  archived: "archived",
-  banned: "banned",
-};
-
 export const COMMENT_STATE = {
   active: "active",
   archived: "archived",
