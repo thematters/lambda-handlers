@@ -1,5 +1,5 @@
 import { invalidateFQC } from "@matters/apollo-response-cache";
-import axios, { AxiosRequestConfig, AxiosHeaders } from "axios";
+import axios from "axios";
 import { Knex } from "knex";
 
 import { pgKnex } from "./db.js";
@@ -17,12 +17,13 @@ type UserOAuthLikeCoinAccountType = "temporal" | "general";
 
 type RequestProps = {
   endpoint: string;
-  headers?: { [key: string]: any };
+  method: "GET" | "POST";
   liker?: UserOAuthLikeCoin;
-  withClientCredential?: boolean;
+  data?: any;
   ip?: string;
   userAgent?: string;
-} & AxiosRequestConfig;
+  timeout?: number;
+};
 
 interface UserOAuthLikeCoin {
   likerId: string;
@@ -64,8 +65,6 @@ const ENDPOINT = {
 
 const ERROR_CODE = {
   TOKEN_EXPIRED: "TOKEN_EXPIRED",
-  EMAIL_ALREADY_USED: "EMAIL_ALREADY_USED",
-  OAUTH_USER_ID_ALREADY_USED: "OAUTH_USER_ID_ALREADY_USED",
   LOGIN_NEEDED: "LOGIN_NEEDED",
   INSUFFICIENT_PERMISSION: "INSUFFICIENT_PERMISSION",
 };
@@ -155,7 +154,6 @@ export class LikeCoin {
       ip: likerIp,
       userAgent,
       endpoint,
-      withClientCredential: true,
       method: "POST",
       liker,
       data: {
@@ -193,8 +191,7 @@ export class LikeCoin {
       liker,
       ip: likerIp,
       userAgent,
-      withClientCredential: true,
-      params: {
+      data: {
         referrer: encodeURI(url),
       },
     });
@@ -208,62 +205,65 @@ export class LikeCoin {
   };
 
   private requestIsCivicLiker = async ({ likerId }: { likerId: string }) => {
-    const res = await this.request({
-      endpoint: `/users/id/${likerId}/min`,
-      method: "GET",
-      timeout: 2000,
-      // liker,
-    });
+    let res: any;
+    try {
+      res = await this.request({
+        endpoint: `/users/id/${likerId}/min`,
+        method: "GET",
+        timeout: 2000,
+      });
+    } catch (e: any) {
+      const code = e.response?.status as any;
+      if (code === 404) {
+        console.warn(`likerId ${likerId} not exsit`);
+        return false;
+      }
+      throw e;
+    }
     return !!res?.data?.isSubscribedCivicLiker;
   };
 
   private request = async ({
+    method,
     endpoint,
     liker,
-    withClientCredential,
+    data,
     ip,
     userAgent,
-    headers = {},
-    ...axiosOptions
+    timeout,
   }: RequestProps) => {
     let accessToken = liker?.accessToken;
     const makeRequest = () => {
       // Headers
+      const headers = {} as any;
       if (accessToken) {
-        (headers as AxiosHeaders).set("Authorization", `Bearer ${accessToken}`);
+        headers["Authorization"] = `Bearer ${accessToken}`;
       }
       if (ip) {
-        (headers as AxiosHeaders).set("X-LIKECOIN-REAL-IP", ip);
+        headers["X-LIKECOIN-REAL-IP"] = ip;
       }
       if (userAgent) {
-        (headers as AxiosHeaders).set("X-LIKECOIN-USER-AGENT", userAgent);
+        headers["X-LIKECOIN-USER-AGENT"] = userAgent;
       }
 
-      // Params
-      let params = {};
-      if (withClientCredential) {
-        if (axiosOptions.method === "GET") {
-          params = {
-            ...params,
-            client_id: likecoinClientId,
-            client_secret: likecoinClientSecret,
-          };
-        } else if (axiosOptions.data) {
-          axiosOptions.data = {
-            ...axiosOptions.data,
-            client_id: likecoinClientId,
-            client_secret: likecoinClientSecret,
-          };
-        }
-      }
-
-      return axios({
-        url: endpoint,
+      data = {
+        ...data,
+        client_id: likecoinClientId,
+        client_secret: likecoinClientSecret,
+      };
+      const instance = axios.create({
         baseURL: likecoinApiURL,
-        params,
         headers,
-        ...axiosOptions,
+        timeout,
       });
+
+      if (method === "GET") {
+        return instance.get(endpoint, {
+          params: data,
+        });
+      } else {
+        return instance.post(endpoint, data);
+      }
     };
 
     let retries = 0;
@@ -283,11 +283,6 @@ export class LikeCoin {
             }
             break;
 
-          case ERROR_CODE.EMAIL_ALREADY_USED:
-            throw new Error("email already used.");
-          case ERROR_CODE.OAUTH_USER_ID_ALREADY_USED:
-            throw new Error("user id already used.");
-
           // notify client to prompt the user for reauthentication.
           // case ERROR_CODE.LOGIN_NEEDED: // was not re-trying
           case ERROR_CODE.INSUFFICIENT_PERMISSION:
@@ -295,8 +290,6 @@ export class LikeCoin {
               "token has no permission to access the resource, please reauth."
             );
         }
-
-        console.error(e);
         throw e;
       }
     }
@@ -309,7 +302,6 @@ export class LikeCoin {
   }): Promise<string> => {
     const res = await this.request({
       endpoint: ENDPOINT.acccessToken,
-      withClientCredential: true,
       method: "POST",
       data: {
         grant_type: "refresh_token",
@@ -342,3 +334,8 @@ export class LikeCoin {
   }): Promise<UserOAuthLikeCoin | null> =>
     this.knex.select().from("user_oauth_likecoin").where({ likerId }).first();
 }
+
+//const likecoin = new LikeCoin();
+//(likecoin as any).requestIsCivicLiker({
+//  likerId: "chiao22",
+//});
