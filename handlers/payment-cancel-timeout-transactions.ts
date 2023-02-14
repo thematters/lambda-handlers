@@ -1,4 +1,4 @@
-import { cancelTimeoutTransactions } from "../lib/payment/index.js";
+import { PaymentService } from "../lib/payment/index.js";
 
 // envs
 // MATTERS_PG_HOST
@@ -6,4 +6,7 @@ import { cancelTimeoutTransactions } from "../lib/payment/index.js";
 // MATTERS_PG_PASSWORD
 // MATTERS_PG_DATABASE
 
-export const handler = async (event: any) => cancelTimeoutTransactions();
+const paymentService = new PaymentService();
+
+export const handler = async (event: any) =>
+  paymentService.cancelTimeoutTransactions();

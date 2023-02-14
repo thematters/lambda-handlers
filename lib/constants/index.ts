@@ -24,3 +24,10 @@ export const USER_STATE = {
   banned: "banned",
   archived: "archived",
 };
+
+export enum INVITATION_STATE {
+  pending = "pending",
+  accepted = "accepted",
+  transfer_succeeded = "transfer_succeeded",
+  transfer_failed = "transfer_failed",
+}
