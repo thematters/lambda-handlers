@@ -27,6 +27,10 @@ jobs:
           POSTGRES_DB: matters-test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
     steps:
       - uses: actions/checkout@v3
         with:
@@ -54,6 +58,7 @@ jobs:
           MATTERS_PG_DATABASE: matters-test
           MATTERS_NEW_FEATURE_TAG_ID: 1
           MATTERS_PG_RO_CONNECTION_STRING: postgresql://postgres:postgres@localhost/test_matters-test
+          MATTERS_CACHE_HOST: localhost
 
   build-and-publish:
     name: Build Lambda-Handlers Docker Image & Publish to AWS ECR
