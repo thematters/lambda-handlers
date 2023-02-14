@@ -1,10 +1,3 @@
-export enum PAYMENT_PROVIDER {
-  likecoin = "likecoin",
-  matters = "matters",
-  stripe = "stripe",
-  blockchain = "blockchain",
-}
-
 export enum TRANSACTION_STATE {
   pending = "pending",
   succeeded = "succeeded",
@@ -36,6 +29,13 @@ export enum TRANSACTION_REMARK {
   INVALID = "invalid",
 }
 
+export enum INVITATION_STATE {
+  pending = "pending",
+  accepted = "accepted",
+  transfer_succeeded = "transfer_succeeded",
+  transfer_failed = "transfer_failed",
+}
+
 export const SUBSCRIPTION_STATE = {
   active: "active",
   pastDue: "past_due",
@@ -46,9 +46,20 @@ export const SUBSCRIPTION_STATE = {
   trialing: "trialing",
 };
 
-export enum INVITATION_STATE {
-  pending = "pending",
-  accepted = "accepted",
-  transfer_succeeded = "transfer_succeeded",
-  transfer_failed = "transfer_failed",
+export enum SUBSCRIPTION_ITEM_REMARK {
+  trial_end = "trial_end",
+  trial_cancel = "trial_cancel",
 }
+
+export enum PAYMENT_PROVIDER {
+  likecoin = "likecoin",
+  matters = "matters",
+  stripe = "stripe",
+  blockchain = "blockchain",
+}
+
+export const PRICE_STATE = {
+  active: "active",
+  archived: "archived",
+  banned: "banned",
+};

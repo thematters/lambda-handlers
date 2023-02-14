@@ -1,12 +1,18 @@
 import { v4 } from "uuid";
+import { invalidateFQC } from "@matters/apollo-response-cache";
+
 import { pgKnex as knex } from "../db.js";
-import { INVITATION_STATE } from "../constants/index.js";
+import { Cache } from "../cache.js";
+import { NODE_TYPE } from "../constants/index.js";
 import {
   TRANSACTION_STATE,
   TRANSACTION_REMARK,
   TRANSACTION_PURPOSE,
-  SUBSCRIPTION_STATE,
   PAYMENT_PROVIDER,
+  SUBSCRIPTION_STATE,
+  SUBSCRIPTION_ITEM_REMARK,
+  PRICE_STATE,
+  INVITATION_STATE,
 } from "./enum.js";
 
 export class PaymentService {
@@ -17,7 +23,7 @@ export class PaymentService {
   }
 
   cancelTimeoutTransactions = async () =>
-    await knex("transaction")
+    await this.knex("transaction")
       .update({
         state: TRANSACTION_STATE.canceled,
         remark: TRANSACTION_REMARK.TIME_OUT,
@@ -28,7 +34,172 @@ export class PaymentService {
         purpose: TRANSACTION_PURPOSE.payout,
       });
 
-  findActiveSubscriptions = async ({
+  transferTrialEndSubscriptions = async () => {
+    // obtain trial end subscription items from the past 7 days
+    const trialEndSubItems = await this.knex
+      .select(
+        "csi.id",
+        "csi.subscription_id",
+        "csi.user_id",
+        "csi.price_id",
+        "circle_price.provider_price_id",
+        "circle_price.circle_id",
+        "expired_ivts.id as invitation_id"
+      )
+      .from(
+        knex("circle_invitation")
+          .select(
+            "*",
+            knex.raw(
+              `accepted_at + duration_in_days * '1 day'::interval AS ended_at`
+            )
+          )
+          .where({ state: INVITATION_STATE.accepted })
+          .whereNotNull("subscription_item_id")
+          .as("expired_ivts")
+      )
+      .leftJoin(
+        "circle_subscription_item as csi",
+        "csi.id",
+        "expired_ivts.subscription_item_id"
+      )
+      .leftJoin("circle_price", "circle_price.id", "csi.price_id")
+      .where({
+        "csi.provider": PAYMENT_PROVIDER.matters,
+        "csi.archived": false,
+        "circle_price.state": PRICE_STATE.active,
+      })
+      .andWhere("ended_at", ">", knex.raw(`now() - interval '1 months'`))
+      .andWhere("ended_at", "<=", knex.raw(`now()`));
+
+    const succeedItemIds = [];
+    const failedItemIds = [];
+    for (const item of trialEndSubItems) {
+      try {
+        // archive Matters subscription item
+        await this.archiveMattersSubItem({
+          subscriptionId: item.subscriptionId,
+          subscriptionItemId: item.id,
+        });
+
+        // create Stripe subscription item
+        await this.createStripeSubItem({
+          userId: item.userId,
+          subscriptionItemId: item.id,
+          priceId: item.priceId,
+          providerPriceId: item.providerPriceId,
+        });
+
+        // mark invitation as `transfer_succeeded`
+        await this.markInvitationAs({
+          invitationId: item.invitationId,
+          state: INVITATION_STATE.transfer_succeeded,
+        });
+
+        succeedItemIds.push(item.id);
+        console.info(`Matters subscription item ${item.id} moved to Stripe.`);
+      } catch (error) {
+        // mark invitation as `transfer_failed`
+        await this.markInvitationAs({
+          invitationId: item.invitationId,
+          state: INVITATION_STATE.transfer_failed,
+        });
+
+        failedItemIds.push(item.id);
+        console.error(error);
+      }
+
+      // invalidate user & circle
+      const cache = new Cache();
+      invalidateFQC({
+        node: { type: NODE_TYPE.User, id: item.userId },
+        redis: cache.redis,
+      });
+      invalidateFQC({
+        node: { type: NODE_TYPE.Circle, id: item.circleId },
+        redis: cache.redis,
+      });
+    }
+  };
+
+  private archiveMattersSubItem = async ({
+    subscriptionId,
+    subscriptionItemId,
+  }: {
+    subscriptionId: string;
+    subscriptionItemId: string;
+  }) => {
+    const subItems = await this.knex("circle_subscription_item")
+      .select()
+      .where({ subscriptionId, archived: false });
+
+    // cancel the subscription if only one subscription item left
+    if (subItems.length <= 1) {
+      await this.knex("circle_subscription")
+        .where({ id: subscriptionId })
+        .update({
+          state: SUBSCRIPTION_STATE.canceled,
+          canceledAt: new Date(),
+          updatedAt: new Date(),
+        });
+    }
+
+    await this.knex("circle_subscription_item")
+      .where({ id: subscriptionItemId })
+      .update({
+        archived: true,
+        updatedAt: new Date(),
+        canceledAt: new Date(),
+        remark: SUBSCRIPTION_ITEM_REMARK.trial_end,
+      });
+  };
+
+  private createStripeSubItem = async ({
+    userId,
+    subscriptionItemId,
+    priceId,
+    providerPriceId,
+  }: {
+    userId: string;
+    subscriptionItemId: string;
+    priceId: string;
+    providerPriceId: string;
+  }) => {
+    // retrieve user customer and subscriptions
+    const customer = await this.knex("customer")
+      .select()
+      .where({
+        userId,
+        provider: PAYMENT_PROVIDER.stripe,
+        archived: false,
+      })
+      .first();
+    const subscriptions = await this.findActiveSubscriptions({
+      userId,
+    });
+
+    if (!customer || !customer.cardLast4) {
+      throw new Error("Credit card is required on customer");
+    }
+
+    await this.createSubscriptionOrItem({
+      userId,
+      priceId,
+      providerPriceId,
+      providerCustomerId: customer.customerId,
+      subscriptions,
+    });
+  };
+
+  private markInvitationAs = async ({
+    invitationId,
+    state,
+  }: {
+    invitationId: string;
+    state: INVITATION_STATE;
+  }) => knex("circle_invitation").where({ id: invitationId }).update({ state });
+
+  private findActiveSubscriptions = async ({
     userId,
     provider,
   }: {
@@ -48,7 +219,7 @@ export class PaymentService {
     return subscriptions || [];
   };
 
-  createSubscriptionOrItem = async (data: {
+  private createSubscriptionOrItem = async (data: {
     userId: string;
     priceId: string;
     providerPriceId: string;

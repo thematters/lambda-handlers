@@ -2,6 +2,32 @@ export const DAY = 24 * 60 * 60 * 1000;
 
 export const EMAIL_FROM_ASK = "Matters<ask@matters.news>";
 
+export enum NODE_TYPE {
+  Article = "Article",
+  Comment = "Comment",
+  Draft = "Draft",
+  User = "User",
+  Tag = "Tag",
+  Appreciation = "Appreciation",
+  Transaction = "Transaction",
+  Circle = "Circle",
+  Topic = "Topic",
+  Chapter = "Chapter",
+
+  SkippedListItem = "SkippedListItem",
+  Price = "Price",
+  Invitation = "Invitation",
+  Announcement = "Announcement",
+  CryptoWallet = "CryptoWallet",
+  CryptoWalletNFTAsset = "NFTAsset",
+
+  // Unions & Interfaces
+  Node = "Node",
+  Notice = "Notice",
+  Response = "Response",
+  TransactionTarget = "TransactionTarget",
+}
+
 export const ARTICLE_STATE = {
   active: "active",
   archived: "archived",
@@ -24,10 +50,3 @@ export const USER_STATE = {
   banned: "banned",
   archived: "archived",
 };
-
-export enum INVITATION_STATE {
-  pending = "pending",
-  accepted = "accepted",
-  transfer_succeeded = "transfer_succeeded",
-  transfer_failed = "transfer_failed",
-}
