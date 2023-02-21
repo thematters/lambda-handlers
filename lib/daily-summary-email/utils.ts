@@ -2,13 +2,8 @@ import { Base64 } from "js-base64";
 import { makeSummary } from "@matters/ipns-site-generator";
 
 import { sql, pgKnex } from "../../lib/db.js";
-import { ARTICLE_STATE } from "../constants/index.js";
-import {
-  APPRECIATION_PURPOSE,
-  COMMENT_STATE,
-  COMMENT_TYPE,
-  NODE_TYPE,
-} from "./enum.js";
+import { ARTICLE_STATE, NODE_TYPE } from "../constants/index.js";
+import { APPRECIATION_PURPOSE, COMMENT_STATE, COMMENT_TYPE } from "./enum.js";
 
 type UserDigest = {
   id: string;

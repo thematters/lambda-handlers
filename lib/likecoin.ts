@@ -2,6 +2,7 @@ import { invalidateFQC } from "@matters/apollo-response-cache";
 import axios from "axios";
 import { Knex } from "knex";
 
+import { NODE_TYPE } from "./constants/index.js";
 import { pgKnex } from "./db.js";
 import { Cache } from "./cache.js";
 
@@ -129,7 +130,7 @@ export class LikeCoin {
 
     // invalidation should after data update
     await invalidateFQC({
-      node: { type: "User", id: userId },
+      node: { type: NODE_TYPE.User, id: userId },
       redis: { client: cache.redis },
     });
   };
