@@ -7,15 +7,17 @@ export const syncStripeDeliveryFailedEvents = async () => {
   const result = await stripe.getDeliveryFailedEvents();
   if (result && result.length > 0) {
     // send message to Slack
-    result.map(async (event) => {
-      slack.sendStripeAlert({
-        data: {
-          id: event.id,
-          type: event.type,
-          pending_webhooks: event.pending_webhooks,
-        },
-        message: "Delivery failed event",
-      });
-    });
+    await Promise.all(
+      result.map((event) =>
+        slack.sendStripeAlert({
+          data: {
+            id: event.id,
+            type: event.type,
+            pending_webhooks: event.pending_webhooks,
+          },
+          message: "Delivery failed event",
+        })
+      )
+    );
   }
 };
