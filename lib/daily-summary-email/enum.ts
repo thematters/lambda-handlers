@@ -79,29 +79,3 @@ export const COMMENT_TYPE = {
   circleDiscussion: "circle_discussion",
   circleBroadcast: "circle_broadcast",
 };
-
-export enum NODE_TYPE {
-  Article = "Article",
-  Comment = "Comment",
-  Draft = "Draft",
-  User = "User",
-  Tag = "Tag",
-  Appreciation = "Appreciation",
-  Transaction = "Transaction",
-  Circle = "Circle",
-  Topic = "Topic",
-  Chapter = "Chapter",
-
-  SkippedListItem = "SkippedListItem",
-  Price = "Price",
-  Invitation = "Invitation",
-  Announcement = "Announcement",
-  CryptoWallet = "CryptoWallet",
-  CryptoWalletNFTAsset = "NFTAsset",
-
-  // Unions & Interfaces
-  Node = "Node",
-  Notice = "Notice",
-  Response = "Response",
-  TransactionTarget = "TransactionTarget",
-}
