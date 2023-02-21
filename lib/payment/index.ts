@@ -15,6 +15,8 @@ import {
   INVITATION_STATE,
 } from "./enum.js";
 
+const expire = process.env.MATTERS_SUBSCRIPTION_TRIAL_EXPIRE || "";
+
 export class PaymentService {
   knex: typeof knex;
 
@@ -35,7 +37,7 @@ export class PaymentService {
       });
 
   transferTrialEndSubscriptions = async () => {
-    // obtain trial end subscription items from the past 7 days
+    // obtain trial end subscription items from the past 30 days
     const trialEndSubItems = await this.knex
       .select(
         "csi.id",
@@ -51,7 +53,9 @@ export class PaymentService {
           .select(
             "*",
             knex.raw(
-              `accepted_at + duration_in_days * '1 day'::interval AS ended_at`
+              `accepted_at + ${
+                expire ? expire : "duration_in_days * '1 day'"
+              }::interval AS ended_at`
             )
           )
           .where({ state: INVITATION_STATE.accepted })
