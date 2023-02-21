@@ -117,11 +117,11 @@ export class PaymentService {
       const cache = new Cache();
       invalidateFQC({
         node: { type: NODE_TYPE.User, id: item.userId },
-        redis: cache.redis,
+        redis: { client: cache.redis },
       });
       invalidateFQC({
         node: { type: NODE_TYPE.Circle, id: item.circleId },
-        redis: cache.redis,
+        redis: { client: cache.redis },
       });
     }
   };
