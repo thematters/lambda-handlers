@@ -51,23 +51,6 @@ export async function refreshSearchIndexUser({
   do {
     try {
       {
-        /*
-        const res = await pgKnex.raw( `? ON CONFLICT (id) DO UPDATE SET user_name = EXCLUDED.user_name, indexed_at = CURRENT_TIMESTAMP RETURNING * ;`,
-          [
-            pgKnex("search_index.user").insert([
-              { id: 233, userName: "az111" },
-              { id: 234, userName: "az112" },
-            ]),
-          ]
-        );
-        console.log(
-          new Date(),
-          `inserted (or updated) ${res.rowCount} items:`,
-          res.rows
-        );
-      */
-      }
-      {
         const started = Date.now();
 
         for await (const rows of dbApi
@@ -92,14 +75,7 @@ export async function refreshSearchIndexUser({
           );
 
           console.log(new Date(), `prepared ${rows.length} items:`, rows);
-          const res = await /* pgKnex.raw(
-            `-- insert new users, or update
-? ON CONFLICT (id) DO UPDATE SET user_name = EXCLUDED.user_name, display_name = EXCLUDED.display_name, num_followers = EXCLUDED.num_followers, indexed_at = CURRENT_TIMESTAMP
-RETURNING * ;`,
-            [pgKnex("search_index.user").insert(rows)]
-          ); */
-
-          sqlSIW`-- upsert new users
+          const res = await sqlSIW`-- upsert new users
 INSERT INTO search_index.user(id, user_name, display_name, display_name_orig, description, state, created_at, num_followers, last_followed_at) -- $ {sql(rows)}
   SELECT * FROM UNNEST(
     ${sqlSIW.array(
@@ -171,7 +147,7 @@ RETURNING * ;`;
       {
         // const searchKey = "用戶名";
         const started = Date.now();
-        const res = await sql`-- sample search
+        const res = await sqlSIW`-- sample search
 SELECT * FROM search_index.user
 WHERE display_name ~* ${searchKey} OR user_name ~* ${searchKey} OR plainto_tsquery('chinese_zh', ${searchKey}) @@ display_name_ts
 ORDER BY (display_name = ${searchKey} OR user_name = ${searchKey}) DESC,
@@ -214,8 +190,6 @@ export async function refreshSearchIndexTag({
   checkLastBatchOffset = 0,
   range = "1 month",
 } = {}) {
-  // const [{ version, now }] = await sql` SELECT VERSION(), NOW() `; console.log("pgres:", { version, now });
-
   let retries = 0;
   const migrateFunc = async () => {
     await sql.file("./sql/create-table-search-index-tag.sql");
@@ -227,33 +201,7 @@ export async function refreshSearchIndexTag({
     try {
       {
         const started = Date.now();
-        /* const allTags = sql`-- refresh table as view
--- REFRESH MATERIALIZED VIEW CONCURRENTLY search_index.tag ;
 
-SELECT id, content, -- content AS content_orig, -- to be filled later with opencc conversion
-  description, num_articles, num_authors, num_followers
-FROM public.tag
-LEFT JOIN (
-  SELECT target_id, COUNT(*) ::int AS num_followers,
-    MAX(created_at) AS latest_followed_at
-  FROM action_tag
-  GROUP BY 1
-) actions ON target_id=tag.id
-LEFT JOIN (
-  SELECT tag_id, COUNT(*)::int AS num_articles, COUNT(DISTINCT author_id) ::int AS num_authors
-  FROM article_tag JOIN article ON article_id=article.id
-  GROUP BY 1
-) at ON tag_id=tag.id
-
--- remove known duplicates from 'mat_views.tags_lasts'
-WHERE
-  tag.id NOT IN ( SELECT UNNEST( array_remove(dup_tag_ids, id) ) FROM mat_views.tags_lasts WHERE ARRAY_LENGTH(dup_tag_ids,1)>1 )
-  AND ( tag.id IN ( SELECT DISTINCT tag_id FROM article_tag WHERE age(created_at) <= ${range} ::interval )
-     OR tag.id IN ( SELECT DISTINCT target_id FROM action_tag WHERE age(created_at) <= ${range} ::interval ) )
-
-ORDER BY latest_followed_at DESC NULLS LAST, tag.updated_at DESC
-LIMIT ${checkLastBatchSize} OFFSET ${checkLastBatchOffset}
-; `; */
         for await (const rows of dbApi
           .listRecentTags({
             take: checkLastBatchSize,
@@ -271,19 +219,8 @@ LIMIT ${checkLastBatchSize} OFFSET ${checkLastBatchOffset}
               ]);
             })
           );
-          /* const res = await sql`-- insert new tags, or update
-INSERT INTO search_index.tag ${sql(rows)}
-ON CONFLICT (id)
-DO UPDATE SET
-  content = EXCLUDED.content,
-  num_followers = EXCLUDED.num_followers,
-  indexed_at = NOW()
-RETURNING * ;`; */
-          const res = await /* pgKnex.raw(
-            `? ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content, num_followers = EXCLUDED.num_followers, indexed_at = CURRENT_TIMESTAMP RETURNING * ;`,
-            [pgKnex("search_index.tag").insert(rows)]
-          ); */
-          sqlSIW`-- insert new tags, or update
+
+          const res = await sqlSIW`-- insert new tags, or update
 INSERT INTO search_index.tag(id, content, content_orig, description, created_at, num_articles, num_authors, num_followers, last_followed_at)
   SELECT * FROM UNNEST(
     ${sqlSIW.array(
@@ -358,9 +295,9 @@ RETURNING * ; `;
 
       {
         const started = Date.now();
-        const res = await sql`-- sample search
-SELECT * FROM search_index.tag
-WHERE content ~* ${searchKey} OR content_ts @@ plainto_tsquery('chinese_zh', ${searchKey})
+        const res = await sqlSIW`-- sample search
+SELECT * FROM search_index.tag, plainto_tsquery('chinese_zh', ${searchKey}) query
+WHERE content ~* ${searchKey} OR content_ts @@ query
 ORDER BY (content = ${searchKey}) DESC,
   num_articles DESC NULLS LAST, id ASC
 LIMIT 100 ;`;
@@ -428,7 +365,7 @@ export async function refreshSearchIndexArticle({
     );
 
     const res = await sqlSIW`-- upsert refresh on target DB search_index.article
-INSERT INTO search_index.article(id, title, author_id, summary, text_content_converted, num_views, created_at, last_read_at)
+INSERT INTO search_index.article(id, title, author_id, summary, text_content_converted, num_views, state, author_state, created_at, last_read_at)
   SELECT * FROM UNNEST(
     ${sqlSIW.array(
       articles.map(({ id }) => id),
@@ -457,6 +394,14 @@ INSERT INTO search_index.article(id, title, author_id, summary, text_content_con
       ARRAY_TYPE
     )} ::int[],
     ${sqlSIW.array(
+      articles.map(({ state }) => state),
+      ARRAY_TYPE
+    )} ::text[],
+    ${sqlSIW.array(
+      articles.map(({ authorState }) => authorState),
+      ARRAY_TYPE
+    )} ::text[],
+    ${sqlSIW.array(
       articles.map(({ createdAt }) =>
         (createdAt as Date)?.toISOString()
       ) as string[],
@@ -474,7 +419,10 @@ DO UPDATE
     , author_id = EXCLUDED.author_id
     , text_content_converted = EXCLUDED.text_content_converted
     , num_views = EXCLUDED.num_views
+    , state = EXCLUDED.state
+    , author_state = EXCLUDED.author_state
     -- , created_at = EXCLUDED.created_at
+    , last_read_at = EXCLUDED.last_read_at
     , indexed_at = CURRENT_TIMESTAMP
 
 RETURNING * ;`;

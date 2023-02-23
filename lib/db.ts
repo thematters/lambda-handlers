@@ -30,7 +30,25 @@ const pgSearchDatabaseURL =
   "postgresql://no-exist@no-exist/no-exist";
 export const sqlSIW = getPostgresJsClient(pgSearchDatabaseURL);
 
-import { Article } from "../lib/pg-zhparser-articles-indexer.js";
+// import { Article } from "../lib/pg-zhparser-articles-indexer.js";
+
+export interface Article {
+  id: string;
+  articleId: string;
+  title: string;
+  titleOrig?: string;
+  authorId: string | number;
+  slug: string;
+  summary: string;
+  content?: string;
+  textContent?: string;
+  textContentConverted?: string;
+  createdAt: Date | string;
+  numViews?: number;
+  state: string;
+  authorState: string;
+  lastReadAt?: Date;
+}
 
 export class DbApi {
   listArticles({
@@ -54,24 +72,25 @@ export class DbApi {
       skip,
       // batchSize,
     });
-    // const singleIdClause = articleId ? sql` (article_id=${articleId}) ` : sql``;
+    const allRecentChangedArticleIds = sql` ( SELECT DISTINCT id FROM article WHERE updated_at >= CURRENT_DATE - ${range} ::interval ) `; // include state change
     const allRecentReadArticleIds = sql` ( SELECT DISTINCT article_id FROM article_read_count WHERE user_id IS NOT NULL AND created_at >= CURRENT_DATE - ${range} ::interval ) `;
     const allRecentPublishedArticles = sql` ( SELECT id FROM article WHERE state='active' AND created_at >= CURRENT_DATE - ${range} ::interval ) `;
 
     return sql<Article[]>`-- check articles from past week
-SELECT a.*, num_views, extract(epoch from last_read_at) AS last_read_timestamp
+SELECT * -- a.*, num_views, extract(epoch from last_read_at) AS last_read_timestamp
 FROM (
   SELECT -- draft.id,
     a.id, a.title, a.summary, -- a.slug, a.draft_id, a.summary,
-    draft.content, draft.author_id, a.created_at -- , a.state, d.publish_state
+    draft.content, draft.author_id, a.created_at, a.state, author.state AS author_state, draft.publish_state
   FROM article a JOIN draft ON draft_id=draft.id -- AND article_id=article.id
-  WHERE state='active' AND publish_state='published'
+  LEFT JOIN public.user author ON author.id=draft.author_id
+  WHERE
     ${
       Array.isArray(articleIds)
-        ? sql`AND a.id IN ${sql(articleIds)}`
+        ? sql`a.id IN ${sql(articleIds)}`
         : range
-        ? sql`AND a.id IN ( ${allRecentReadArticleIds} UNION ${allRecentPublishedArticles})`
-        : sql``
+        ? sql`a.id IN ( ${allRecentChangedArticleIds} UNION ${allRecentReadArticleIds} UNION ${allRecentPublishedArticles} )`
+        : sql`a.state='active' AND draft.publish_state='published'`
     }
 ) a
 LEFT JOIN (
@@ -130,6 +149,8 @@ ORDER BY id DESC
     range?: string;
     orderBy?: "lastFollowedAt" | "seqDesc";
   } = {}) {
+    // const allRecentChangedUserIds = sql` ( SELECT DISTINCT id FROM public.user WHERE updated_at >= CURRENT_DATE - ${range} ::interval ) `; // include state change
+
     return sql`-- refresh table as view
 SELECT id, user_name, display_name, description, state, created_at, num_followers, last_followed_at
 FROM public.user u
@@ -139,11 +160,11 @@ LEFT JOIN (
   FROM action_user
   GROUP BY 1
 ) t ON target_id=u.id
--- WHERE -- state IN ('active', 'onboarding')
+WHERE -- state IN ('active', 'onboarding')
   ${
     range
-      ? sql`WHERE ( u.id IN ( SELECT DISTINCT target_id FROM action_user WHERE created_at <= CURRENT_DATE - ${range} ::interval ) OR u.updated_at >= CURRENT_DATE - ${range} ::interval )`
-      : sql``
+      ? sql`( u.id IN ( SELECT DISTINCT target_id FROM action_user WHERE created_at <= CURRENT_DATE - ${range} ::interval ) OR u.updated_at >= CURRENT_DATE - ${range} ::interval )`
+      : sql`state IN ('active', 'onboarding')`
   }
 
 ORDER BY ${

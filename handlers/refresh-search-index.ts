@@ -3,9 +3,10 @@ import { Context, APIGatewayProxyResult, APIGatewayEvent } from "aws-lambda";
 import {
   refreshSearchIndexUser,
   refreshSearchIndexTag,
+  refreshSearchIndexArticle,
 } from "../lib/refresh-search-index.js";
 
-interface indexInput {
+interface indexArgs {
   searchKey?: string;
   migrate?: boolean;
   checkLastBatchSize?: number;
@@ -15,20 +16,22 @@ interface indexInput {
 
 export const handler = async (
   event: APIGatewayEvent & {
-    user?: indexInput;
-    tag?: indexInput;
+    userArgs?: indexArgs;
+    tagArgs?: indexArgs;
+    articleArgs?: indexArgs;
   },
   context: Context
 ): Promise<APIGatewayProxyResult> => {
   console.log(`Event: ${JSON.stringify(event, null, 2)}`);
   console.log(`Context: ${JSON.stringify(context, null, 2)}`);
 
-  const { user: userInput, tag: tagInput } = event;
+  const { userArgs, tagArgs, articleArgs } = event;
 
   await Promise.allSettled([
     // checkMotorBadge(),
-    refreshSearchIndexUser(userInput),
-    refreshSearchIndexTag(tagInput),
+    refreshSearchIndexUser(userArgs),
+    refreshSearchIndexTag(tagArgs),
+    refreshSearchIndexArticle(articleArgs),
   ]);
 
   return {
