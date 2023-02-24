@@ -9,6 +9,8 @@ RUN npm install
 COPY ./lib ./lib
 COPY ./bin ./bin
 COPY ./handlers ./handlers
+COPY ./tsconfig.json ./
+RUN node --loader ts-node/esm ./bin/gen-handlers-entry.ts
 COPY ./tsconfig.json ./*.ts ./
 RUN npm run build
 

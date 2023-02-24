@@ -6,7 +6,7 @@ Multiple lambda packaged in one docker image, and to create multiple lambda hand
 
 feat(lambda): multiple lambda handlers in one repo
 
-- [x] indexer-meilisearch
+- [x] refresh-search-index (include search_index.{article,user,tag})
 - [x] check-motor-badge
 - [x] sendmail
 - [ ] ipns-listener
@@ -48,9 +48,8 @@ and push it with `docker image push {above-full-image}:v{date-tag}`, test it wit
 ### Create new lambda worker:
 
 1. create handler entry code in `./handlers/<new-lambda>.ts`, export the handler;
-2. create a one liner entry code at top level, like:
-   export \* from "./handlers/<new-lambda>.js";
-   ( this part might be able to automated later; )
+2. a one liner entry code at top level, like: `export * from "./handlers/<new-lambda>.js";`
+   is genereated for every `./handlers/*.ts` file automatically in docker build step;
 3. create a PR and after merged, the CI will build and publish to ECR register:
    `<acount>.dkr.ecr.ap-southeast-1.amazonaws.com/lambda-handlers-image:v<new-version>`
 4. from AWS Lambda Console, create the lambda function from docker image, use above full `image_uri`,

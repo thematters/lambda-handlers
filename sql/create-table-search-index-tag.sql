@@ -4,11 +4,11 @@ DROP TABLE IF EXISTS search_index.tag ;
 
 CREATE TABLE IF NOT EXISTS search_index.tag AS
   SELECT id, lower(trim(both '#＃ ' from content)) AS content, content AS content_orig, -- to be filled later with opencc conversion
-    description, num_articles, num_authors, num_followers -- , NOW() AS indexed_at
+    description, created_at, num_articles, num_authors, num_followers, last_followed_at -- , NOW() AS indexed_at
   FROM public.tag
   LEFT JOIN (
     SELECT target_id, COUNT(*) ::int AS num_followers,
-      MAX(created_at) AS latest_followed_at
+      MAX(created_at) AS last_followed_at
     FROM action_tag
     GROUP BY 1
   ) actions ON target_id=tag.id
@@ -18,17 +18,25 @@ CREATE TABLE IF NOT EXISTS search_index.tag AS
     GROUP BY 1
   ) at ON tag_id=tag.id
 
-  WHERE tag.id NOT IN ( SELECT UNNEST( array_remove(dup_tag_ids, id) ) FROM mat_views.tags_lasts WHERE ARRAY_LENGTH(dup_tag_ids,1)>1 )
-  ORDER BY latest_followed_at DESC NULLS LAST, tag.id DESC
-  LIMIT 10000
+  -- WHERE tag.id NOT IN ( SELECT UNNEST( array_remove(dup_tag_ids, id) ) FROM mat_views.tags_lasts WHERE ARRAY_LENGTH(dup_tag_ids,1)>1 )
+  -- ORDER BY last_followed_at DESC NULLS LAST, tag.id DESC
+  LIMIT 0
 ;
 
-ALTER TABLE search_index.tag ADD PRIMARY KEY (id) ;
+ALTER TABLE search_index.tag ADD PRIMARY KEY (id), ALTER COLUMN content SET NOT NULL ;
 -- CREATE UNIQUE INDEX IF NOT EXISTS search_tag_id_index ON search_index.tag (id) ;
 
+ALTER TABLE search_index.tag ADD COLUMN content_ts tsvector GENERATED ALWAYS AS (to_tsvector('chinese_zh', content)) STORED ;
+ALTER TABLE search_index.tag ADD COLUMN description_ts tsvector GENERATED ALWAYS AS (to_tsvector('chinese_zh', description)) STORED ;
+ALTER TABLE search_index.tag ADD COLUMN content_jieba_ts tsvector GENERATED ALWAYS AS (to_tsvector('jiebacfg', content)) STORED ;
+ALTER TABLE search_index.tag ADD COLUMN description_jieba_ts tsvector GENERATED ALWAYS AS (to_tsvector('jiebacfg', description)) STORED ;
 ALTER TABLE search_index.tag ADD COLUMN IF NOT EXISTS indexed_at timestamptz DEFAULT CURRENT_TIMESTAMP ;
 
-CREATE INDEX IF NOT EXISTS search_tag_name_index ON search_index.tag (content) ;
+CREATE INDEX IF NOT EXISTS search_index_tag_name_index ON search_index.tag (content) ;
  -- supposed to be Unique, but old table already has exact duplicates
-CREATE INDEX IF NOT EXISTS search_tag_name_orig_index ON search_index.tag (content_orig) ;
+CREATE INDEX IF NOT EXISTS search_index_tag_name_orig_index ON search_index.tag (content_orig) ;
+CREATE INDEX IF NOT EXISTS search_index_tag_content_ts_gin_idx ON search_index.tag USING GIN (content_ts) ;
+CREATE INDEX IF NOT EXISTS search_index_tag_description_ts_gin_idx ON search_index.tag USING GIN (description_ts) ;
+CREATE INDEX IF NOT EXISTS search_index_tag_content_rumidx ON search_index.tag USING RUM (content_jieba_ts rum_tsvector_ops);
+CREATE INDEX IF NOT EXISTS search_index_tag_description_rumidx ON search_index.tag USING RUM (description_jieba_ts rum_tsvector_ops);
 

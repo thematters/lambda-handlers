@@ -25,54 +25,66 @@ const databaseRoURL =
 export const pgKnexRO = getKnexClient(databaseRoURL);
 export const sqlRO = getPostgresJsClient(databaseRoURL);
 
-import { Article } from "../lib/meili-indexer.js";
+const pgSearchDatabaseURL =
+  process.env.MATTERS_PG_SEARCH_CONNECTION_STRING ||
+  "postgresql://no-exist@no-exist/no-exist";
+export const sqlSIW = getPostgresJsClient(pgSearchDatabaseURL);
+
+import { Article } from "../lib/pg-zhparser-articles-indexer.js";
 
 export class DbApi {
   listArticles({
     articleIds,
     take = 5,
     skip = 0,
-    batchSize = 5,
+    // batchSize = 5,
     range = "1 week",
+    orderBy = "lastRead",
   }: {
     articleIds?: string[];
     take?: number;
     skip?: number;
-    batchSize?: number;
+    // batchSize?: number;
     range?: string;
+    orderBy?: "lastRead" | "seqDesc";
   } = {}) {
     console.log(new Date(), `listArticles:`, {
       articleIds,
       take,
       skip,
-      batchSize,
+      // batchSize,
     });
     // const singleIdClause = articleId ? sql` (article_id=${articleId}) ` : sql``;
-    const allArticleIds = sql` ( SELECT DISTINCT article_id FROM article_read_count WHERE user_id IS NOT NULL AND age(created_at) <= ${range}::interval ) `;
-    const allRecentArticles = sql` ( SELECT id FROM article WHERE state='active' AND age(created_at) <= ${range}::interval ) `;
+    const allRecentReadArticleIds = sql` ( SELECT DISTINCT article_id FROM article_read_count WHERE user_id IS NOT NULL AND created_at >= CURRENT_DATE - ${range} ::interval ) `;
+    const allRecentPublishedArticles = sql` ( SELECT id FROM article WHERE state='active' AND created_at >= CURRENT_DATE - ${range} ::interval ) `;
 
     return sql<Article[]>`-- check articles from past week
-SELECT *
+SELECT a.*, num_views, extract(epoch from last_read_at) AS last_read_timestamp
 FROM (
-  SELECT draft.id, draft.article_id, draft.title, article.slug, draft.summary, draft.content, draft.created_at, article.state, draft.publish_state
-  FROM draft JOIN article ON article_id=article.id AND article_id IS NOT NULL
+  SELECT -- draft.id,
+    a.id, a.title, a.summary, -- a.slug, a.draft_id, a.summary,
+    draft.content, draft.author_id, a.created_at -- , a.state, d.publish_state
+  FROM article a JOIN draft ON draft_id=draft.id -- AND article_id=article.id
   WHERE state='active' AND publish_state='published'
-    AND
-      ${
-        Array.isArray(articleIds)
-          ? sql`article_id IN ${sql(articleIds)}`
-          : sql`article_id IN ( ${allArticleIds} UNION ALL ${allRecentArticles})`
-      }
-) d
+    ${
+      Array.isArray(articleIds)
+        ? sql`AND a.id IN ${sql(articleIds)}`
+        : range
+        ? sql`AND a.id IN ( ${allRecentReadArticleIds} UNION ${allRecentPublishedArticles})`
+        : sql``
+    }
+) a
 LEFT JOIN (
-  SELECT article_id, COUNT(*)::int AS num_views
+  SELECT article_id, COUNT(*) ::int AS num_views,
+    MAX(created_at) AS last_read_at
   FROM article_read_count
   WHERE user_id IS NOT NULL
   GROUP BY 1
-) t USING (article_id)
-ORDER BY article_id DESC
-LIMIT ${take} OFFSET ${skip}
-`; // .cursor(batchSize);
+) t ON article_id=a.id
+
+ORDER BY ${orderBy === "lastRead" ? sql`last_read_at DESC NULLS LAST,` : sql``}
+  a.id DESC
+LIMIT ${take} OFFSET ${skip} ; `;
   }
 
   listRecentAuthors({
@@ -105,6 +117,93 @@ WHERE t.last_article_published >= ${since}
 ORDER BY id DESC
 -- OFFSET floor(RANDOM() * 100 + 1)::int
 -- LIMIT 5000 `;
+  }
+
+  listRecentUsers({
+    take = 5,
+    skip = 0,
+    range = "1 week",
+    orderBy = "seqDesc",
+  }: {
+    take?: number;
+    skip?: number;
+    range?: string;
+    orderBy?: "lastFollowedAt" | "seqDesc";
+  } = {}) {
+    return sql`-- refresh table as view
+SELECT id, user_name, display_name, description, state, created_at, num_followers, last_followed_at
+FROM public.user u
+LEFT JOIN (
+  SELECT target_id, COUNT(*) ::int AS num_followers,
+    MAX(created_at) AS last_followed_at
+  FROM action_user
+  GROUP BY 1
+) t ON target_id=u.id
+-- WHERE -- state IN ('active', 'onboarding')
+  ${
+    range
+      ? sql`WHERE ( u.id IN ( SELECT DISTINCT target_id FROM action_user WHERE created_at <= CURRENT_DATE - ${range} ::interval ) OR u.updated_at >= CURRENT_DATE - ${range} ::interval )`
+      : sql``
+  }
+
+ORDER BY ${
+      orderBy === "lastFollowedAt"
+        ? sql`last_followed_at DESC NULLS LAST,`
+        : sql``
+    }
+  -- u.updated_at DESC,
+  u.id DESC
+LIMIT ${take} OFFSET ${skip} ;`;
+  }
+
+  listRecentTags({
+    take = 5,
+    skip = 0,
+    range = "1 week",
+    orderBy = "seqDesc",
+  }: {
+    take?: number;
+    skip?: number;
+    range?: string;
+    orderBy?: "lastFollowedAt" | "seqDesc";
+  } = {}) {
+    const allRecentInUseTagIds = sql` (
+            SELECT DISTINCT tag_id FROM article_tag WHERE created_at >= CURRENT_DATE - ${range} ::interval
+      UNION SELECT DISTINCT target_id FROM action_tag WHERE created_at >= CURRENT_DATE - ${range} ::interval ) `;
+
+    return sql`-- refresh table as view
+SELECT id, content, description, created_at, num_articles, num_authors, num_followers, last_followed_at
+FROM public.tag
+LEFT JOIN (
+  SELECT target_id, COUNT(*) ::int AS num_followers,
+    MAX(created_at) AS last_followed_at
+  FROM action_tag
+  GROUP BY 1
+) actions ON target_id=tag.id
+LEFT JOIN (
+  SELECT tag_id, COUNT(*) ::int AS num_articles, COUNT(DISTINCT author_id) ::int AS num_authors
+  FROM article_tag JOIN article ON article_id=article.id AND article.state IN ('active')
+  GROUP BY 1
+) at ON tag_id=tag.id
+
+-- remove known duplicates from 'mat_views.tags_lasts'
+WHERE
+  tag.id NOT IN ( SELECT UNNEST( array_remove(dup_tag_ids, id) ) FROM mat_views.tags_lasts WHERE ARRAY_LENGTH(dup_tag_ids,1)>1 )
+  ${
+    range
+      ? sql`AND ( tag.updated_at >= CURRENT_DATE - ${range} ::interval OR tag.id IN ( ${allRecentInUseTagIds} ) )`
+      : sql``
+  }
+
+ORDER BY ${
+      orderBy === "lastFollowedAt"
+        ? sql`last_followed_at DESC NULLS LAST,`
+        : sql``
+    }
+  -- tag.updated_at DESC,
+  tag.id DESC
+
+LIMIT ${take} OFFSET ${skip} ; `;
   }
 
   queryArticlesByUuid(uuids: string[]) {

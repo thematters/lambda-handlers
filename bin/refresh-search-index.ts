@@ -3,17 +3,52 @@
 import {
   refreshSearchIndexUser,
   refreshSearchIndexTag,
+  refreshSearchIndexArticle,
 } from "../lib/refresh-search-index.js";
 
 async function main() {
   const args = process.argv.slice(2);
-  const checkLastBatchSize = Number.parseInt(args[0], 10) || 1000;
-  const checkLastBatchOffset = Number.parseInt(args[1], 10) || 0;
-  const range = args[2] || "1 month";
+
+  let skipUser = false,
+    skipTag = false,
+    skipArticle = false;
+  while (args[0]?.startsWith("--")) {
+    switch (args.shift()) {
+      case "--skipUser":
+        skipUser = true;
+        break;
+      case "--skipTag":
+        skipTag = true;
+        break;
+      case "--skipArticle":
+        skipArticle = true;
+        break;
+    }
+  }
+
+  const checkLastBatchSize = Number.parseInt(args[0] ?? "1000", 10);
+  const checkLastBatchOffset = Number.parseInt(args[1] ?? "0", 10);
+  const range = args[2] ?? "1 month";
 
   await Promise.allSettled([
-    refreshSearchIndexUser({ checkLastBatchSize, checkLastBatchOffset, range }),
-    refreshSearchIndexTag({ checkLastBatchSize, checkLastBatchOffset, range }),
+    !skipUser &&
+      refreshSearchIndexUser({
+        checkLastBatchSize,
+        checkLastBatchOffset,
+        range,
+      }),
+    !skipTag &&
+      refreshSearchIndexTag({
+        checkLastBatchSize,
+        checkLastBatchOffset,
+        range,
+      }),
+    !skipArticle &&
+      refreshSearchIndexArticle({
+        checkLastBatchSize,
+        checkLastBatchOffset,
+        range,
+      }),
   ]);
 }
 
