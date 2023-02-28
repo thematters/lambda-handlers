@@ -167,7 +167,7 @@ export class LikeCoin {
   }: {
     likerId: string;
     userId: string;
-    isCivicLiker: Boolean;
+    isCivicLiker: boolean;
     expire: number;
   }) => {
     // update cache
