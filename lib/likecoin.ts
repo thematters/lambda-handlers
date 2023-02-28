@@ -142,16 +142,20 @@ export class LikeCoin {
     const civicLikerIdsSet = new Set(civicLikerIds);
     const mattersLikerData = await this.knex("user")
       .select("id", "liker_id")
-      .whereNotNull("liker_id");
+      .whereNotNull("liker_id")
+      .whereNot("liker_id", "");
     await Promise.all(
-      mattersLikerData.map(async ({ id, likerId }) =>
-        this._updateCivicLikerCache({
-          likerId,
-          userId: id,
-          isCivicLiker: civicLikerIdsSet.has(likerId),
-          expire,
-        })
-      )
+      mattersLikerData.map(async ({ id, likerId }) => {
+        const isCivicLiker = civicLikerIdsSet.has(likerId);
+        if (isCivicLiker) {
+          this._updateCivicLikerCache({
+            likerId,
+            userId: id,
+            isCivicLiker,
+            expire,
+          });
+        }
+      })
     );
   };
 

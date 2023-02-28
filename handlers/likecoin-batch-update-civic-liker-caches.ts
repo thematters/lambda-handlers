@@ -25,7 +25,7 @@ export const handler = async (
   }
 
   const civicLikerIds = event;
-  const expire = 60 * 60 * 24 * 1.1; // 1.1 days
+  const expire = 60 * 60 * 24; // 1 days
 
   try {
     await likecoin.updateCivicLikerCaches({ civicLikerIds, expire });
