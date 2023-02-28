@@ -59,6 +59,11 @@ interface UpdateCivicLikerCacheData {
   expire: number;
 }
 
+interface UpdateCivicLikerCachesData {
+  civicLikerIds: string[];
+  expire: number;
+}
+
 const ENDPOINT = {
   acccessToken: "/oauth/access_token",
   like: "/like/likebutton",
@@ -72,8 +77,10 @@ const ERROR_CODE = {
 
 export class LikeCoin {
   knex: Knex;
+  cache: Cache;
   constructor() {
     this.knex = pgKnex;
+    this.cache = new Cache();
   }
 
   like = async (data: LikeData) => {
@@ -109,7 +116,6 @@ export class LikeCoin {
     key,
     expire,
   }: UpdateCivicLikerCacheData) => {
-    const cache = new Cache();
     let isCivicLiker;
     try {
       isCivicLiker = await this.requestIsCivicLiker({
@@ -117,13 +123,52 @@ export class LikeCoin {
       });
     } catch (e) {
       // remove from cache so new reqeust can trigger a retry
-      await cache.removeObject({ key });
+      await this.cache.removeObject({ key });
       throw e;
     }
 
+    await this._updateCivicLikerCache({
+      likerId,
+      userId,
+      isCivicLiker,
+      expire,
+    });
+  };
+
+  updateCivicLikerCaches = async ({
+    civicLikerIds,
+    expire,
+  }: UpdateCivicLikerCachesData) => {
+    const civicLikerIdsSet = new Set(civicLikerIds);
+    const mattersLikerData = await this.knex("user")
+      .select("id", "liker_id")
+      .whereNotNull("liker_id");
+    await Promise.all(
+      mattersLikerData.map(async ({ id, likerId }) =>
+        this._updateCivicLikerCache({
+          likerId,
+          userId: id,
+          isCivicLiker: civicLikerIdsSet.has(likerId),
+          expire,
+        })
+      )
+    );
+  };
+
+  private _updateCivicLikerCache = async ({
+    likerId,
+    userId,
+    isCivicLiker,
+    expire,
+  }: {
+    likerId: string;
+    userId: string;
+    isCivicLiker: Boolean;
+    expire: number;
+  }) => {
     // update cache
-    await cache.storeObject({
-      key,
+    await this.cache.storeObject({
+      key: this.cache.genKey("civic-liker", { id: likerId }),
       data: isCivicLiker,
       expire,
     });
@@ -131,7 +176,7 @@ export class LikeCoin {
     // invalidation should after data update
     await invalidateFQC({
       node: { type: NODE_TYPE.User, id: userId },
-      redis: { client: cache.redis },
+      redis: { client: this.cache.redis },
     });
   };
 
