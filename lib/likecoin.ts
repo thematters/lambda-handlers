@@ -52,16 +52,14 @@ interface SendPVData {
   url: string;
 }
 
-interface UpdateCivicLikerCacheData {
+interface BaseUpdateCivicLikerCacheData {
   likerId: string;
-  userId: string;
-  key: string;
   expire: number;
 }
 
-interface UpdateCivicLikerCachesData {
-  civicLikerIds: string[];
-  expire: number;
+interface UpdateCivicLikerCacheData extends BaseUpdateCivicLikerCacheData {
+  userId: string;
+  key: string;
 }
 
 const ENDPOINT = {
@@ -135,24 +133,25 @@ export class LikeCoin {
     });
   };
 
-  updateCivicLikerCaches = async ({
-    civicLikerIds,
-    expire,
-  }: UpdateCivicLikerCachesData) => {
-    const civicLikerIdsSet = new Set(civicLikerIds);
+  updateCivicLikerCaches = async (
+    likerCacheData: BaseUpdateCivicLikerCacheData[]
+  ) => {
+    const likerIdToExpires = Object.fromEntries(
+      likerCacheData.map(({ likerId, expire }) => [likerId, expire])
+    );
     const mattersLikerData = await this.knex("user")
       .select("id", "liker_id")
       .whereNotNull("liker_id")
       .whereNot("liker_id", "");
     await Promise.all(
       mattersLikerData.map(async ({ id, likerId }) => {
-        const isCivicLiker = civicLikerIdsSet.has(likerId);
+        const isCivicLiker = likerId in likerIdToExpires;
         if (isCivicLiker) {
           this._updateCivicLikerCache({
             likerId,
             userId: id,
             isCivicLiker,
-            expire,
+            expire: likerIdToExpires[likerId],
           });
         }
       })
