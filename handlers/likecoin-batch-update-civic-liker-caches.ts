@@ -30,7 +30,10 @@ export const handler = async (event: Event): Promise<APIGatewayProxyResult> => {
 
   try {
     await likecoin.updateCivicLikerCaches(
-      event.map(({ id, expires }) => ({ likerId: id, expire: expires * DAY }))
+      event.map(({ id, expires }) => ({
+        likerId: id,
+        expire: (expires + 1) * DAY,
+      }))
     );
     return {
       statusCode: 200,
