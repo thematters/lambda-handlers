@@ -122,10 +122,11 @@ export class LikeCoin {
     }
 
     // update cache
+    const hour = 60 * 60;
     await cache.storeObject({
       key,
       data: isCivicLiker,
-      expire,
+      expire: expire + getRandomInt(1, hour),
     });
 
     // invalidation should after data update
@@ -335,6 +336,12 @@ export class LikeCoin {
   }): Promise<UserOAuthLikeCoin | null> =>
     this.knex.select().from("user_oauth_likecoin").where({ likerId }).first();
 }
+
+const getRandomInt = (min: number, max: number): number => {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min)) + min;
+};
 
 //const likecoin = new LikeCoin();
 //(likecoin as any).requestIsCivicLiker({
