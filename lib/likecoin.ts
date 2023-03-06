@@ -141,8 +141,10 @@ export class LikeCoin {
     );
     const mattersLikerData = await this.knex("user")
       .select("id", "liker_id")
-      .whereNotNull("liker_id")
-      .whereNot("liker_id", "");
+      .whereIn(
+        "liker_id",
+        likerCacheData.map(({ likerId, expire }) => likerId)
+      );
     await Promise.all(
       mattersLikerData.map(async ({ id, likerId }) => {
         const isCivicLiker = likerId in likerIdToExpires;
