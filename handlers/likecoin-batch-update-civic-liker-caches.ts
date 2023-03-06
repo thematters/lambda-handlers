@@ -11,11 +11,10 @@ import { LikeCoin } from "../lib/likecoin.js";
 
 type Event = {
   id: string;
-  expires: number; // in days
+  expires: number; // unix timestamp
 }[];
 
 const likecoin = new LikeCoin();
-const DAY = 24 * 60 * 60;
 
 export const handler = async (event: Event): Promise<APIGatewayProxyResult> => {
   console.log(event);
@@ -32,7 +31,7 @@ export const handler = async (event: Event): Promise<APIGatewayProxyResult> => {
     await likecoin.updateCivicLikerCaches(
       event.map(({ id, expires }) => ({
         likerId: id,
-        expire: (expires + 1) * DAY,
+        expire: getTTL(expires) || 1, //  zero expire is invalid for redis
       }))
     );
     return {
@@ -52,6 +51,12 @@ export const handler = async (event: Event): Promise<APIGatewayProxyResult> => {
   }
 };
 
+// return ttl in seconds
+const getTTL = (expires: number): number => {
+  const ttl = +new Date(expires * 1000) - +Date.now();
+  return Math.ceil(Math.max(0, ttl) / 1000);
+};
+
 const validate = (event: any): boolean => {
   if (!Array.isArray(event)) {
     return false;
@@ -61,6 +66,10 @@ const validate = (event: any): boolean => {
       return false;
     }
     if (typeof i.expires !== "number") {
+      return false;
+    }
+    // check if unix time in seconds
+    if (i.expires.toString().length !== 10) {
       return false;
     }
   }
