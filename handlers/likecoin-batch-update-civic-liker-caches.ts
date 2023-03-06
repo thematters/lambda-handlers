@@ -9,13 +9,17 @@ import { LikeCoin } from "../lib/likecoin.js";
 // MATTERS_PG_PASSWORD
 // MATTERS_PG_DATABASE
 
-const likecoin = new LikeCoin();
+type Event = {
+  id: string;
+  expires: number; // in days
+}[];
 
-export const handler = async (
-  event: string[]
-): Promise<APIGatewayProxyResult> => {
+const likecoin = new LikeCoin();
+const DAY = 24 * 60 * 60;
+
+export const handler = async (event: Event): Promise<APIGatewayProxyResult> => {
   console.log(event);
-  if (!Array.isArray(event)) {
+  if (!validate(event)) {
     return {
       statusCode: 400,
       body: JSON.stringify({
@@ -24,11 +28,13 @@ export const handler = async (
     };
   }
 
-  const civicLikerIds = event;
-  const expire = 60 * 60 * 24; // 1 days
-
   try {
-    await likecoin.updateCivicLikerCaches({ civicLikerIds, expire });
+    await likecoin.updateCivicLikerCaches(
+      event.map(({ id, expires }) => ({
+        likerId: id,
+        expire: (expires + 1) * DAY,
+      }))
+    );
     return {
       statusCode: 200,
       body: JSON.stringify({
@@ -44,4 +50,19 @@ export const handler = async (
       }),
     };
   }
+};
+
+const validate = (event: any): boolean => {
+  if (!Array.isArray(event)) {
+    return false;
+  }
+  for (const i of event) {
+    if (typeof i.id !== "string") {
+      return false;
+    }
+    if (typeof i.expires !== "number") {
+      return false;
+    }
+  }
+  return true;
 };
