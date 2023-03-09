@@ -52,11 +52,14 @@ interface SendPVData {
   url: string;
 }
 
-interface UpdateCivicLikerCacheData {
+interface BaseUpdateCivicLikerCacheData {
   likerId: string;
+  expire: number;
+}
+
+interface UpdateCivicLikerCacheData extends BaseUpdateCivicLikerCacheData {
   userId: string;
   key: string;
-  expire: number;
 }
 
 const ENDPOINT = {
@@ -72,8 +75,10 @@ const ERROR_CODE = {
 
 export class LikeCoin {
   knex: Knex;
+  cache: Cache;
   constructor() {
     this.knex = pgKnex;
+    this.cache = new Cache();
   }
 
   like = async (data: LikeData) => {
@@ -109,7 +114,6 @@ export class LikeCoin {
     key,
     expire,
   }: UpdateCivicLikerCacheData) => {
-    const cache = new Cache();
     let isCivicLiker;
     try {
       isCivicLiker = await this.requestIsCivicLiker({
@@ -117,22 +121,68 @@ export class LikeCoin {
       });
     } catch (e) {
       // remove from cache so new reqeust can trigger a retry
-      await cache.removeObject({ key });
+      await this.cache.removeObject({ key });
       throw e;
     }
 
-    // update cache
     const hour = 60 * 60;
-    await cache.storeObject({
-      key,
-      data: isCivicLiker,
+    await this._updateCivicLikerCache({
+      likerId,
+      userId,
+      isCivicLiker,
       expire: expire + getRandomInt(1, hour),
+    });
+  };
+
+  updateCivicLikerCaches = async (
+    likerCacheData: BaseUpdateCivicLikerCacheData[]
+  ) => {
+    const likerIdToExpires = Object.fromEntries(
+      likerCacheData.map(({ likerId, expire }) => [likerId, expire])
+    );
+    const mattersLikerData = await this.knex("user")
+      .select("id", "liker_id")
+      .whereIn(
+        "liker_id",
+        likerCacheData.map(({ likerId, expire }) => likerId)
+      );
+    await Promise.all(
+      mattersLikerData.map(async ({ id, likerId }) => {
+        const isCivicLiker = likerId in likerIdToExpires;
+        if (isCivicLiker) {
+          this._updateCivicLikerCache({
+            likerId,
+            userId: id,
+            isCivicLiker,
+            expire: likerIdToExpires[likerId],
+          });
+        }
+      })
+    );
+  };
+
+  private _updateCivicLikerCache = async ({
+    likerId,
+    userId,
+    isCivicLiker,
+    expire,
+  }: {
+    likerId: string;
+    userId: string;
+    isCivicLiker: boolean;
+    expire: number;
+  }) => {
+    // update cache
+    await this.cache.storeObject({
+      key: this.cache.genKey("civic-liker", { id: likerId }),
+      data: isCivicLiker,
+      expire,
     });
 
     // invalidation should after data update
     await invalidateFQC({
       node: { type: NODE_TYPE.User, id: userId },
-      redis: { client: cache.redis },
+      redis: { client: this.cache.redis },
     });
   };
 
