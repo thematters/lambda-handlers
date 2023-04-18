@@ -10,8 +10,8 @@ export async function getUserInfo(userName: string, { year = 2022 } = {}) {
 
   // const year = 2022;
   return sql`-- get user info
-SELECT user_name, display_name, u.created_at, ${year} ::int AS year,
-  ('https://assets.matters.news/' || path) AS avatar,
+SELECT u.id ::int, user_name, display_name, u.created_at, ${year} ::int AS year,
+  ('https://assets.matters.news/' || path) AS avatar, badges, u.eth_address,
   num_readings, num_writings,
   num_donated_articles, num_appreciated_articles,
   num_followed_authors,
@@ -66,6 +66,11 @@ LEFT JOIN (
     AND author_id=${user.id}
   GROUP BY 1
 ) c ON c.author_id=u.id
+LEFT JOIN (
+  SELECT user_id, ARRAY_AGG(DISTINCT type) AS badges
+  FROM user_badge
+  GROUP BY 1
+) b ON b.user_id=u.id
 WHERE -- user_name=$ {userName}
   u.id=${user.id}
 LIMIT 1 ;`;
