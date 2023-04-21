@@ -12,6 +12,7 @@ feat(lambda): multiple lambda handlers in one repo
 - [ ] ipns-listener
 - [x] user-retention
 - [x] likecoin
+- [x] cloudflare-image-stats-alert (not using docker, copy the source code to lambda to deploy)
 
 ## Dependencies
 
