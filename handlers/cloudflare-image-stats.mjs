@@ -3,7 +3,7 @@
 const accountId = process.env.MATTERS_CLOUDFLARE_ACCOUNT_ID;
 const token = process.env.MATTERS_CLOUDFLARE_API_TOKEN;
 const alertThreshold =
-  +process.env.MATTERS_CLOUDFLARE_IMAGE_ALERT_THRESHOLD || 100000; // 100k
+  +process.env.MATTERS_CLOUDFLARE_IMAGE_ALERT_THRESHOLD || 100e3; // 100k
 const slackWebhook = process.env.MATTERS_SLACK_WEBHOOK;
 
 const getRemainingCapacity = async (accountId, token) => {
