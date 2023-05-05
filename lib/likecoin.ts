@@ -82,17 +82,25 @@ export class LikeCoin {
   }
 
   like = async (data: LikeData) => {
-    const { likerId } = data;
+    const { likerId, url } = data;
     const liker = await this.findLiker({ likerId });
 
     if (!liker) {
       throw new Error(`liker (${likerId}) not found.`);
     }
 
-    await this.requestLike({
-      liker,
-      ...data,
-    });
+    if (url.startsWith("https://matters.news")) {
+      await this.requestLike({
+        liker,
+        ...data,
+        url: url.replace("https://matters.news", "https://matters.town"),
+      });
+    } else {
+      await this.requestLike({
+        liker,
+        ...data,
+      });
+    }
   };
 
   sendPV = async (data: SendPVData) => {
