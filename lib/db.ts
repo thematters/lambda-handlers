@@ -74,7 +74,7 @@ export class DbApi {
     });
     const allRecentChangedArticleIds = sql` ( SELECT DISTINCT id FROM article WHERE updated_at >= CURRENT_DATE - ${range} ::interval ) `; // include state change
     const allRecentReadArticleIds = sql` ( SELECT DISTINCT article_id FROM article_read_count WHERE user_id IS NOT NULL AND created_at >= CURRENT_DATE - ${range} ::interval ) `;
-    const allRecentPublishedArticles = sql` ( SELECT id FROM article WHERE state='active' AND created_at >= CURRENT_DATE - ${range} ::interval ) `;
+    const allRecentPublishedArticles = sql` ( SELECT id FROM article WHERE created_at >= CURRENT_DATE - ${range} ::interval ) `; // this is actually included in allRecentChangedArticleIds
 
     return sql<Article[]>`-- check articles from past week
 SELECT * -- a.*, num_views, extract(epoch from last_read_at) AS last_read_timestamp
@@ -172,7 +172,7 @@ ORDER BY ${
         ? sql`last_followed_at DESC NULLS LAST,`
         : sql``
     }
-  -- u.updated_at DESC,
+  u.updated_at DESC,
   u.id DESC
 LIMIT ${take} OFFSET ${skip} ;`;
   }

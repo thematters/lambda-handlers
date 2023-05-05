@@ -53,6 +53,7 @@ export async function refreshSearchIndexUser({
       {
         const started = Date.now();
 
+        let processed = 0;
         for await (const rows of dbApi
           .listRecentUsers({
             take: checkLastBatchSize,
@@ -128,9 +129,10 @@ DO UPDATE
     , indexed_at = CURRENT_TIMESTAMP
 
 RETURNING * ;`;
+          processed += res.length;
           debugLog(
             new Date(),
-            `inserted (or updated) ${res.length} items:`,
+            `inserted (or updated) ${res.length} (of ${processed}) items:`,
             res.map(({ id, userName }) => `/@${userName}, ${id}`) // .rows
           );
         }
@@ -349,8 +351,15 @@ export async function refreshSearchIndexArticle({
     console.log(`got ${articles.length} rows:`);
     await Promise.allSettled(
       articles.map(async (arti, idx) => {
+        if (arti.state !== "active") return; // ignore archived
+
         const $ = cheerio.load(arti.content!);
-        const text = $.text();
+        const text = $("body")
+          .children("p")
+          .toArray()
+          .map((e) => $(e).text().trim())
+          .filter(Boolean)
+          .join("\n"); // $.text();
         // arti.textContent = text;
         arti.titleOrig = arti.title;
         [arti.title, arti.summary, arti.textContentConverted] =
@@ -384,8 +393,8 @@ INSERT INTO search_index.article(id, title, author_id, summary, text_content_con
       ARRAY_TYPE
     )} ::text[],
     ${sqlSIW.array(
-      articles.map(
-        ({ textContentConverted }) => textContentConverted
+      articles.map(({ state, textContentConverted }) =>
+        state === "active" ? textContentConverted : null
       ) as string[],
       ARRAY_TYPE
     )} ::text[],

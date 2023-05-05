@@ -49,14 +49,12 @@ const notifySlack = async (message, slackWebhook) => {
   }
 };
 
-export const handler = async() => {
+export const handler = async () => {
   try {
     const remainingCapacity = await getRemainingCapacity(accountId, token);
     if (remainingCapacity < alertThreshold) {
       const msg = `Remaining capacity is ${remainingCapacity}, less than ${alertThreshold}`;
-      console.log(
-        `${msg}, sending alert...`
-      );
+      console.log(`${msg}, sending alert...`);
       await notifySlack(msg, slackWebhook);
     } else {
       console.log(
@@ -64,6 +62,6 @@ export const handler = async() => {
       );
     }
   } catch (error) {
-      await notifySlack(error.message, slackWebhook);
+    await notifySlack(error.message, slackWebhook);
   }
 };
