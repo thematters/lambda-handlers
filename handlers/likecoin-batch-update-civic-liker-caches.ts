@@ -18,6 +18,7 @@ const likecoin = new LikeCoin();
 
 export const handler = async (event: Event): Promise<APIGatewayProxyResult> => {
   console.log(event);
+
   if (!validate(event)) {
     return {
       statusCode: 400,
@@ -27,12 +28,18 @@ export const handler = async (event: Event): Promise<APIGatewayProxyResult> => {
     };
   }
 
+  const oneday = 86400;
+
   try {
     await likecoin.updateCivicLikerCaches(
-      event.map(({ id, expires }) => ({
-        likerId: id,
-        expire: getTTL(expires) || 1, //  zero expire is invalid for redis
-      }))
+      event.map(({ id, expires }) => {
+        const ttl = getTTL(expires);
+
+        return {
+          likerId: id,
+          expire: ttl === 0 ? 1 : ttl + oneday, //  zero expire is invalid for redis
+        };
+      })
     );
     return {
       statusCode: 200,
