@@ -110,7 +110,7 @@ export class LikeCoin {
         ? undefined
         : (await this.findLiker({ likerId })) || undefined;
 
-    const result = await this.requestCount({
+    await this.requestCount({
       liker: liker,
       ...data,
     });
@@ -152,7 +152,7 @@ export class LikeCoin {
       .select("id", "liker_id")
       .whereIn(
         "liker_id",
-        likerCacheData.map(({ likerId, expire }) => likerId)
+        likerCacheData.map(({ likerId }) => likerId)
       );
     await Promise.all(
       mattersLikerData.map(async ({ id, likerId }) => {
@@ -256,6 +256,7 @@ export class LikeCoin {
       },
     });
     const data = res?.data;
+    console.log("count response:", data);
 
     if (!data) {
       throw res;
@@ -280,6 +281,7 @@ export class LikeCoin {
       }
       throw e;
     }
+    console.log("civicLiker response:", res?.data);
     return !!res?.data?.isSubscribedCivicLiker;
   };
 
