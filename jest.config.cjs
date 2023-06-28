@@ -5,8 +5,8 @@ module.exports = {
   testEnvironment: 'node',
   testRegex: '(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$',
   testPathIgnorePatterns: ['/node_modules/', '/matters-server/'],
-  globalSetup: '<rootDir>/matters-server/db/testSetup.js',
-  globalTeardown: '<rootDir>/matters-server/db/testTeardown.js',
+  globalSetup: '<rootDir>/matters-server/db/globalTestSetup.js',
+  globalTeardown: '<rootDir>/matters-server/db/globalTestTeardown.js',
   transform: {
   '\\.tsx?$': ['ts-jest', {
     useESM: true,
