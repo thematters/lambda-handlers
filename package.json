@@ -6,7 +6,7 @@
   "scripts": {
     "format": "prettier --write \"{,!(node_modules|dist|build|coverage|matters-server)/**/}*.{js,mjs,jsx,ts,tsx,json}\"",
     "format:check": "npm run format -- --list-different",
-    "lint": "eslint .",
+    "lint": "eslint lib/ handlers/ --ext .js,.ts",
     "build": "tsc -p .",
     "test": "MATTERS_ENV=test jest --forceExit"
   },
