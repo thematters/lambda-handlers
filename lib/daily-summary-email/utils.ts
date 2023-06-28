@@ -130,10 +130,10 @@ const sumArticleAppreciation = async (articleId: string) => {
 };
 
 const countArticleActiveCollectedBy = async (articleId: string) => {
-  const result = await pgKnex("collection")
-    .rightJoin("article", "collection.entrance_id", "article.id")
+  const result = await pgKnex("article_connection")
+    .rightJoin("article", "article_connection.entrance_id", "article.id")
     .where({
-      "collection.article_id": articleId,
+      "article_connection.article_id": articleId,
       "article.state": ARTICLE_STATE.active,
     })
     .countDistinct("entrance_id")
