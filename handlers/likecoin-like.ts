@@ -15,8 +15,17 @@ const likecoin = new LikeCoin();
 export const handler = async (event: SQSEvent) => {
   console.log(event);
   const results = await Promise.allSettled(
-    event.Records.map(({ body }: { body: string }) =>
-      likecoin.like(JSON.parse(body))
+    event.Records.map(async ({ body }: { body: string }) => {
+      try {
+       await likecoin.like(JSON.parse(body))
+      } catch (error: any) {
+	if (error.message === "invalid like") {
+	  console.warn(error);
+	} else {
+	  throw error;
+	}
+      }
+    }
     )
   );
 

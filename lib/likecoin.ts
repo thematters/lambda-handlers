@@ -70,6 +70,7 @@ const ENDPOINT = {
 const ERROR_CODE = {
   TOKEN_EXPIRED: "TOKEN_EXPIRED",
   LOGIN_NEEDED: "LOGIN_NEEDED",
+  INVALID_LIKE: "INVALID_LIKE",
   INSUFFICIENT_PERMISSION: "INSUFFICIENT_PERMISSION",
 };
 
@@ -351,6 +352,8 @@ export class LikeCoin {
             throw new Error(
               "token has no permission to access the resource, please reauth."
             );
+	  case ERROR_CODE.INVALID_LIKE:
+	    throw new Error("invalid like");
         }
         throw e;
       }
