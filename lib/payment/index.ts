@@ -32,9 +32,10 @@ export class PaymentService {
       })
       .where("created_at", "<", knex.raw(`now() - ('30 minutes'::interval)`))
       .andWhere({ state: TRANSACTION_STATE.pending })
-      .andWhereNot({
-        purpose: TRANSACTION_PURPOSE.payout,
-      });
+      .whereNotIn("purpose", [
+        TRANSACTION_PURPOSE.payout,
+        TRANSACTION_PURPOSE.dispute,
+      ]);
 
   transferTrialEndSubscriptions = async () => {
     // obtain trial end subscription items from the past 30 days
