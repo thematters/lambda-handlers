@@ -28,7 +28,7 @@ test("loadRecommendedArticles", async () => {
   //     mediaHash: "someIpfsMediaHash1",
   //   },
   // ]);
-  expect(articles).toEqual([])
+  expect(articles).toEqual([]);
   // null lastSeen return nothing
   const articles2 = await loadRecommendedArticles("2", null as any as Date, 3, [
     "0",
