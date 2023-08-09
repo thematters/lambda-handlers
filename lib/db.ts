@@ -72,11 +72,11 @@ export class DbApi {
       skip,
       // batchSize,
     });
-    const allRecentChangedArticleIds = sql` ( SELECT DISTINCT id FROM article WHERE updated_at >= CURRENT_DATE - ${range} ::interval ) `; // include state change
-    const allRecentReadArticleIds = sql` ( SELECT DISTINCT article_id FROM article_read_count WHERE user_id IS NOT NULL AND created_at >= CURRENT_DATE - ${range} ::interval ) `;
-    const allRecentPublishedArticles = sql` ( SELECT id FROM article WHERE created_at >= CURRENT_DATE - ${range} ::interval ) `; // this is actually included in allRecentChangedArticleIds
+    const allRecentChangedArticleIds = sqlRO` ( SELECT DISTINCT id FROM article WHERE updated_at >= CURRENT_DATE - ${range} ::interval ) `; // include state change
+    const allRecentReadArticleIds = sqlRO` ( SELECT DISTINCT article_id FROM article_read_count WHERE user_id IS NOT NULL AND created_at >= CURRENT_DATE - ${range} ::interval ) `;
+    const allRecentPublishedArticles = sqlRO` ( SELECT id FROM article WHERE created_at >= CURRENT_DATE - ${range} ::interval ) `; // this is actually included in allRecentChangedArticleIds
 
-    return sql<Article[]>`-- check articles from past week
+    return sqlRO<Article[]>`-- check articles from past week
 SELECT * -- a.*, num_views, extract(epoch from last_read_at) AS last_read_timestamp
 FROM (
   SELECT -- draft.id,
@@ -110,10 +110,10 @@ LIMIT ${take} OFFSET ${skip} ; `;
     limit = 5000,
     since = "2022-01-01",
   }: { limit?: number; since?: string | Date } = {}) {
-    return sql`-- check latest articles' author ipns_key
+    return sqlRO`-- check latest articles' author ipns_key
 SELECT u2.user_name, u2.display_name, COALESCE(u.last_at ::date, CURRENT_DATE) AS last_seen,
   count_articles, ipns_key, last_data_hash AS top_dir_data_hash, last_published AS last_refreshed, t.*,
-  concat('https://matters.news/@', u2.user_name, '/', t.id, '-', t.slug) AS last_article_url,
+  concat('https://matters.town/@', u2.user_name, '/', t.id, '-', t.slug) AS last_article_url,
   priv_key_pem, priv_key_name
 FROM (
   SELECT DISTINCT ON (author_id) author_id, id, title, slug, data_hash AS last_article_data_hash, media_hash, created_at AS last_article_published
@@ -188,7 +188,7 @@ LIMIT ${take} OFFSET ${skip} ;`;
     range?: string;
     orderBy?: "lastFollowedAt" | "seqDesc";
   } = {}) {
-    const allRecentInUseTagIds = sql` (
+    const allRecentInUseTagIds = sqlRO` (
             SELECT DISTINCT tag_id FROM article_tag WHERE created_at >= CURRENT_DATE - ${range} ::interval
       UNION SELECT DISTINCT target_id FROM action_tag WHERE created_at >= CURRENT_DATE - ${range} ::interval ) `;
 
@@ -228,7 +228,7 @@ LIMIT ${take} OFFSET ${skip} ; `;
   }
 
   queryArticlesByUuid(uuids: string[]) {
-    return sql` SELECT id, title, slug, data_hash, media_hash, created_at FROM article WHERE uuid =ANY(${uuids}) `;
+    return sqlRO` SELECT id, title, slug, data_hash, media_hash, created_at FROM article WHERE uuid =ANY(${uuids}) `;
   }
 
   async checkVersion() {
