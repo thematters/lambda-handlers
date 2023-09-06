@@ -10,9 +10,10 @@ import {
 import slugify from "@matters/slugify";
 
 import {
-  gw3Client,
+  // gw3Client,
   refreshPinLatest,
   refreshIPNSFeed,
+  purgeIPNS,
 } from "../lib/refresh-ipns-gw3.js";
 import { AuthorFeed } from "../lib/author-feed-ipns.js";
 import { ipfsPool } from "../lib/ipfs-servers.js";
@@ -20,12 +21,14 @@ import { dbApi, Item } from "../lib/db.js";
 
 async function main() {
   const args = process.argv.slice(2);
-  let mode: "publishIPNS" | "publishIPFS" | "uploadPinning" = "publishIPNS";
+  let mode: "publishIPNS" | "publishIPFS" | "uploadPinning" | "purgeIPNS" =
+    "publishIPNS";
 
   switch (args?.[0]) {
     case "--publishIPNS":
     case "--publishIPFS":
     case "--uploadPinning":
+    case "--purgeIPNS": // remove IPNS from gw3 for too old no updating ones
       mode = args?.[0].substring(2) as any;
       args.shift();
       break;
@@ -61,12 +64,14 @@ async function main() {
     const [ipnsKeyRec] = await dbApi.getUserIPNSKey(author.id);
     console.log(new Date(), "get user ipns:", ipnsKeyRec);
 
-    const feed = new AuthorFeed(
+    // const feed = new AuthorFeed({ author, ipnsKey: ipnsKeyRec?.ipnsKey, webfHost, drafts, articles });
+    const feed = new AuthorFeed({
       author,
-      ipnsKeyRec?.ipnsKey,
-      drafts.slice(0, 1),
-      articles.slice(0, 1)
-    );
+      ipnsKey: ipnsKeyRec?.ipnsKey,
+      // webfHost, // this is a fake one; no need for single article publishing
+      drafts, // .slice(0, 1),
+      articles, // .slice(0, 1)
+    });
 
     // console.log(new Date(), "get author feed:", feed);
     await feed.loadData();
@@ -96,27 +101,33 @@ async function main() {
     const offset = parseInt(args?.[1] ?? "0");
     await refreshPinLatest({ limit, offset });
     return;
+  } else if (mode === "purgeIPNS") {
+    await purgeIPNS({ skip: 10000 });
+    return;
   }
 
   let forceReplace = false;
   let useMattersIPNS: boolean | undefined;
+  let webfHost: string | undefined;
 
   // publish IPNS mode
   console.log(new Date(), "running with:", args);
-  switch (args?.[0]) {
-    case "--forceReplace":
-      forceReplace = true;
-      args.shift();
-      break;
-    case "--useMattersIPNS":
-    case "--useMattersIPNS=true":
-      useMattersIPNS = true;
-      args.shift();
-      break;
-    case "--useMattersIPNS=false":
-      useMattersIPNS = false;
-      args.shift();
-      break;
+  while (args?.[0]?.startsWith("--")) {
+    switch (args?.[0]?.split("=")?.[0]) {
+      case "--forceReplace":
+        forceReplace = true;
+        break;
+      case "--useMattersIPNS":
+        // case "--useMattersIPNS=true": useMattersIPNS = true;
+        useMattersIPNS = !(args?.[0]?.split("=")?.[1] === "false");
+        break;
+      // case "--useMattersIPNS=false": useMattersIPNS = false; break;
+      case "--webfHost":
+        webfHost = args?.[0]?.split("=")?.[1] as string;
+        console.log(new Date(), "set webfHost:", webfHost);
+        break;
+    }
+    args.shift();
   }
 
   // await testPinning();
@@ -128,6 +139,7 @@ async function main() {
     limit,
     forceReplace,
     useMattersIPNS,
+    webfHost,
   });
   console.log(new Date(), `refreshIPNSFeed res:`, res);
   if (res && res.missing <= res.limit / 10) return;
@@ -140,6 +152,7 @@ async function main() {
       limit: 10,
       forceReplace,
       useMattersIPNS,
+      webfHost,
     });
     console.log(new Date(), `try again refreshIPNSFeed res:`, res);
   }

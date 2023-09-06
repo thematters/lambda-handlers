@@ -1,4 +1,8 @@
 import path from "node:path";
+import { Readable } from "node:stream";
+// import { Blob } from "node:buffer";
+
+import { CID } from "multiformats/cid";
 import shuffle from "lodash/shuffle.js";
 
 import { AuthorFeed } from "../lib/author-feed-ipns.js";
@@ -77,6 +81,23 @@ class GW3Client {
     return res.json();
   }
 
+  async listPins({
+    limit = 100,
+    start = 0,
+    status,
+  }: { limit?: number; start?: number; status?: string } = {}) {
+    const u = new URL(`${GW3_ACCOUNT_API_BASE_URL}/api/v0/pin?ts=${getTs()}`);
+    if (limit) u.searchParams.set("limit", limit as any as string);
+    if (start) u.searchParams.set("start", start as any as string);
+    if (status) u.searchParams.set("status", status);
+
+    const res = await fetch(u, {
+      method: "GET",
+      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+    });
+    return res.json();
+  }
+
   async getPin(cid: string) {
     const u = `${GW3_ACCOUNT_API_BASE_URL}/api/v0/pin/${cid}?ts=${getTs()}`;
     const res = await fetch(u, {
@@ -131,6 +152,62 @@ class GW3Client {
     );
 
     return res.json();
+  }
+
+  async dagImport(file: File | Blob | string) {
+    const size =
+      (file as Blob).size ??
+      // (file as Buffer).byteLength ??
+      (file as any).length;
+
+    const res = await fetch(
+      `https://gw3.io/api/v0/dag/import?size=${size}&ts=${getTs()}`,
+      {
+        method: "POST",
+        headers: this.#authHeaders, // this.#makeAuthHeaders(),
+      }
+    );
+    console.log(
+      new Date(),
+      "dag import res:",
+      res.ok,
+      res.status,
+      res.statusText,
+      res.headers
+      // await res.text()
+    );
+    const resImport = await res.json();
+    if (resImport?.code !== 200 || !resImport?.data?.url) {
+      console.error(new Date(), "dag import error:", resImport);
+      return resImport;
+    }
+    // const { data: { url: importUrl } } = res;
+    const importUrl = resImport.data.url;
+    console.log(
+      new Date(),
+      `dag import sending ${size} bytes file to:`,
+      importUrl
+    );
+
+    const body = new FormData();
+    body.set("file", file);
+    const res2 = await fetch(importUrl, {
+      method: "POST",
+      // headers: { "Content-Type": "multipart/form-data", },
+      body,
+    });
+    console.log(
+      new Date(),
+      "dag import post res:",
+      res2.ok,
+      res2.status,
+      res2.statusText,
+      res2.headers
+      // await res.text()
+    );
+    // if (data.Stats.BlockCount < 1) { }
+
+    return res2.json();
   }
 
   async importFolder(cid: string) {
@@ -192,14 +269,25 @@ class GW3Client {
     return res.json();
   }
 
-  async updateIPNSName({ ipnsKey, cid }: { ipnsKey: string; cid: string }) {
-    const res = await fetch(
-      `https://gw3.io/api/v0/name/publish?key=${ipnsKey}&arg=${cid}&ts=${getTs()}`,
-      {
-        method: "POST",
-        headers: this.#authHeaders, // this.#makeAuthHeaders(),
-      }
+  async updateIPNSName({
+    ipnsKey,
+    cid,
+    pin,
+  }: {
+    ipnsKey: string;
+    cid: string;
+    pin?: boolean;
+  }) {
+    const u = new URL(
+      `https://gw3.io/api/v0/name/publish?key=${ipnsKey}&arg=${cid}&ts=${getTs()}`
     );
+    if (pin === true || pin === false)
+      // not undefined
+      u.searchParams.set("pin", `${pin}`);
+    const res = await fetch(u, {
+      method: "POST",
+      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+    });
 
     console.log(
       new Date(),
@@ -253,6 +341,18 @@ class GW3Client {
     return res.json();
   }
 
+  async rmIPNSName(kid: string) {
+    const u = new URL(`${this.#config.baseURL}/api/v0/name/rm?ts=${getTs()}`);
+    u.searchParams.set("key", kid);
+    const res = await fetch(u, {
+      method: "POST",
+      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+    });
+    // console.log(new Date(), "rmIPNS res:", res.ok, res.status, res.headers);
+
+    return res.json();
+  }
+
   async getIpns(kid: string) {
     const u = `${GW3_ACCOUNT_API_BASE_URL}/api/v0/ipns/${kid}?ts=${getTs()}`;
     const res = await fetch(u, {
@@ -263,15 +363,52 @@ class GW3Client {
 
     return res.json();
   }
+
+  async getIpnsByName(alias: string) {
+    const u = new URL(
+      `${GW3_ACCOUNT_API_BASE_URL}/api/v0/ipns/search?ts=${getTs()}`
+    );
+    u.searchParams.set("alias", alias);
+    const res = await fetch(u, {
+      method: "GET",
+      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+    });
+    console.log(
+      new Date(),
+      "search IPNS res:",
+      res.ok,
+      res.status,
+      res.headers
+    );
+
+    return res.json();
+  }
+
+  async getStats() {
+    const u = new URL(`${GW3_ACCOUNT_API_BASE_URL}/api/v0/stats?ts=${getTs()}`);
+    const res = await fetch(u, {
+      method: "GET",
+      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+    });
+    // console.log( new Date(), "get usage stats res:", res.ok, res.status, res.headers);
+
+    return res.json();
+  }
 }
 
 export const gw3Client = new GW3Client(gw3AccessKey, gw3AccessSecret);
 
-export async function refreshPinLatest({ limit = 100, offset = 0 } = {}) {
+export async function refreshPinLatest({
+  limit = 100,
+  offset = 0,
+  mergeCollectionsTop = true,
+} = {}) {
   const articles = await dbApi.listRecentArticles({
     take: limit,
     skip: offset,
   });
+  if (offset <= 100e3) mergeCollectionsTop = false; // don't merge for last 100,000 articles
+
   const articlesByCid = new Map(
     articles
       .filter(({ dataHash }) => dataHash)
@@ -286,16 +423,60 @@ export async function refreshPinLatest({ limit = 100, offset = 0 } = {}) {
         `${MATTERS_SITE_DOMAIN_PREFIX}/@${userName}/${id}-${slug}`
     )
   );
+
+  const statusByCid = new Map<string, any>();
+  const rowsByStatus = new Map<string, any[]>();
+  const addedTime = Date.now();
+  {
+    // for (let tries = 0; tries < 1; tries++) {
+    // await delay(1000 * (2 + 10 * Math.random()));
+
+    const res = await Promise.all(
+      articles.map(
+        async ({ id, slug, userName, dataHash }) =>
+          dataHash && {
+            userName,
+            dataHash,
+            path: `matters.town/@${userName}/${id}-${slug}`,
+            ...(await gw3Client.getPin(dataHash)),
+          }
+      )
+    );
+    const rows = res.map((r) => (r?.code === 200 ? r.data : r));
+    rowsByStatus.clear();
+    statusByCid.clear();
+
+    rows.forEach((item) => {
+      const status = item?.status ?? "no-result";
+      if (item?.cid) statusByCid.set(item.cid, item);
+      const group = rowsByStatus.get(status) || [];
+      if (!rowsByStatus.has(status)) rowsByStatus.set(status, group);
+      group.push(item);
+    });
+    const now = new Date();
+    console.log(
+      now,
+      `${+now - +addedTime}ms elapsed, got ${
+        rowsByStatus.get("pinned")?.length
+      } pinned...`
+    );
+    // if (rowsByStatus.get("pinned")?.length === limit) break; // break if all pinned early
+  }
+
+  const skipStatuses = new Set(["pinned", "pinning"]);
   const resAdd = await Promise.all(
     articles.map(
       async ({ id, slug, userName, dataHash }) =>
         dataHash && {
           userName,
           dataHash,
-          ...(await gw3Client.addPin(
-            dataHash,
-            `${MATTERS_SITE_DOMAIN_PREFIX}/@${userName}/${id}-${slug}`
-          )),
+          path: `matters.town/@${userName}/${id}-${slug}`,
+          ...(statusByCid.get(dataHash)?.status in skipStatuses
+            ? statusByCid.get(dataHash)
+            : await gw3Client.addPin(
+                dataHash,
+                `${MATTERS_SITE_DOMAIN_PREFIX}/@${userName}/${id}-${slug}`
+              )),
         }
     )
   );
@@ -305,8 +486,6 @@ export async function refreshPinLatest({ limit = 100, offset = 0 } = {}) {
     resAdd.filter((r) => r?.code !== 200)
   );
 
-  const rowsByStatus = new Map<string, any[]>();
-  const addedTime = Date.now();
   for (let tries = 0; tries < 5; tries++) {
     await delay(1000 * (2 + 10 * Math.random()));
 
@@ -316,14 +495,17 @@ export async function refreshPinLatest({ limit = 100, offset = 0 } = {}) {
           dataHash && {
             userName,
             dataHash,
+            path: `matters.town/@${userName}/${id}-${slug}`,
             ...(await gw3Client.getPin(dataHash)),
           }
       )
     );
     const rows = res.map((r) => (r?.code === 200 ? r.data : r));
+    statusByCid.clear();
     rowsByStatus.clear();
     rows.forEach((item) => {
       const status = item?.status ?? "no-result";
+      if (item?.cid) statusByCid.set(item.cid, item);
       const group = rowsByStatus.get(status) || [];
       if (!rowsByStatus.has(status)) rowsByStatus.set(status, group);
       group.push(item);
@@ -338,10 +520,6 @@ export async function refreshPinLatest({ limit = 100, offset = 0 } = {}) {
     if (rowsByStatus.get("pinned")?.length === limit) break; // break if all pinned early
   }
 
-  // merge the pinned into a big directory:
-  const EMPTY_DAG_ROOT = "QmUNLLsPACCz1vLxQVkXqqLX5R1X345qqfHbsf67hvA3Nn";
-  await gw3Client.addPinWait(EMPTY_DAG_ROOT, "EMPTY_DAG_ROOT");
-
   const toAddEntries = rowsByStatus.get("pinned")?.map(({ name, cid }) => {
     if (name) name = path.basename(name);
     const arti = articlesByCid.get(cid);
@@ -354,19 +532,38 @@ export async function refreshPinLatest({ limit = 100, offset = 0 } = {}) {
       cid,
     ];
   }) as [string, string][];
+
+  if (!mergeCollectionsTop) {
+    console.log(
+      new Date(),
+      `skip merging ${toAddEntries.length}(/${limit}) cids into one.`,
+      Array.from(statusByCid.values()).filter((r) => r?.status !== "pinned")
+      // rowsByStatus
+      // toAddEntries
+    );
+    return;
+  }
+
   console.log(
     new Date(),
     `merging ${toAddEntries.length} cids into one.`,
     toAddEntries
   );
+
+  // merge the pinned into a big directory:
+  const EMPTY_DAG_ROOT = "QmUNLLsPACCz1vLxQVkXqqLX5R1X345qqfHbsf67hvA3Nn";
+  await gw3Client.addPinWait(EMPTY_DAG_ROOT, "EMPTY_DAG_ROOT");
+
   let newTopDir = EMPTY_DAG_ROOT; // starts from empty
+  let mergedCount = 0;
   while (toAddEntries?.length > 0) {
     await gw3Client.importFolder(newTopDir);
 
+    const add = toAddEntries.splice(0, 50); // gw3 API changed the limit to 50 since 8/28
     const resFolderOps = await gw3Client.callFolderOperation(newTopDir, {
-      add: toAddEntries.splice(0, 50), // gw3 API changed the limit to 50 since 8/28
+      add,
       pin_new: true,
-      unpin_old: true,
+      unpin_old: newTopDir === EMPTY_DAG_ROOT ? undefined : true,
     });
     console.log(
       new Date(),
@@ -381,6 +578,8 @@ export async function refreshPinLatest({ limit = 100, offset = 0 } = {}) {
       );
       break;
     }
+    mergedCount += add.length;
+
     // const prior = lastCid;
     newTopDir = resFolderOps.data.cid;
   }
@@ -395,7 +594,8 @@ export async function refreshPinLatest({ limit = 100, offset = 0 } = {}) {
   console.log(
     new Date(),
     `merged ${stats["pinned"]} cids into one, with ${toAddEntries.length} left, unpin all pinned sub-links.`,
-    newTopDir
+    newTopDir,
+    mergedCount
   );
 
   // unpin all sub-links
@@ -412,6 +612,248 @@ export async function refreshPinLatest({ limit = 100, offset = 0 } = {}) {
   );
 
   gw3Client.addPin(EMPTY_DAG_ROOT, "EMPTY_DAG_ROOT");
+
+  gw3Client.renamePin(
+    newTopDir,
+    `matters-town-collection-${mergedCount}-articles-${articles?.[0].id}-to-${
+      articles.slice(-1)?.[0].id
+    }`
+  );
+}
+
+function printUsagePercentage(statsData: any): void {
+  // const resStats = await gw3Client.getStats();
+  // const resStatsData = resStats?.code === 200 ? resStats.data : null;
+
+  console.log(
+    new Date(),
+    "printUsagePercentage:",
+    statsData &&
+      `next_bill_at: ${new Date(
+        statsData.next_bill_at * 1e3
+      ).toISOString()}; pinned_count: ${statsData.pinned_count} (${(
+        (100 * statsData.pinned_count) /
+        statsData.pinned_count_limit
+      ).toFixed(1)}%); pinned_bytes: ${(statsData.pinned_bytes / 1073741824) // 1024*1024*1024
+        .toFixed(1)}GiB (${(
+        (100 * statsData.pinned_bytes) /
+        statsData.pinned_bytes_limit
+      ).toFixed(1)}%); ingress: ${(statsData.ingress / 1073741824) // 1024*1024*1024
+        .toFixed(1)}GiB (${(
+        (100 * statsData.ingress) /
+        statsData.ingress_limit
+      ).toFixed(1)}%); egress: ${(statsData.egress / 1073741824) // 1024*1024*1024
+        .toFixed(1)}GiB (${(
+        (100 * statsData.egress) /
+        statsData.egress_limit
+      ).toFixed(1)}%); ipns: ${statsData.ipns} (${(
+        (100 * statsData.ipns) /
+        statsData.ipns_limit
+      ).toFixed(1)}%)`
+    // resStats
+  );
+}
+
+export async function purgeGw3Pins({
+  skip = 100000,
+  countOneTime = 100, // unpin at most 100 items at a time
+  // usageRatioThreshold = 0.9,
+  // resStats,
+  // }: { skip?: number; usageRatioThreshold?: number; resStats?: any } = {}) {
+} = {}) {
+  for (
+    let unpinned = 0, retries = 0;
+    unpinned < countOneTime && retries < 10;
+    retries++
+  ) {
+    const resListPins = await gw3Client.listPins({
+      start: skip + retries * 100,
+    });
+    console.log(new Date(), "listPins:", resListPins);
+    const started = +Date.now() / 1000;
+
+    const pins = resListPins?.code === 200 ? resListPins?.data : null;
+    for (const item of pins) {
+      if (
+        +started - item.created_at <= 604800 ||
+        // 3600*24*7; don't unpin if still within 7 days;
+        item.name?.match(/^matters\.town\/@\w+$/)
+      )
+        // might be the top IPNS directory
+        continue;
+
+      if (
+        item.status === "failure" ||
+        (item.status === "pinned" &&
+          ((+started - item.created_at > 2592000 && // 3600*24*30 for over 30 days
+            item.size >= 100 * 1024) ||
+            item.name?.match(/^matters-town-collection/)))
+      ) {
+        console.log(new Date(), "to unpin:", item);
+        await gw3Client.rmPin(item.cid);
+        if (++unpinned >= countOneTime) break;
+      }
+    }
+    console.log(new Date(), `purge pins:`, { unpinned });
+  }
+}
+
+export async function purgeIPNS({
+  skip = 10000,
+  usageRatioThreshold = 0.9,
+  resStats,
+}: { skip?: number; usageRatioThreshold?: number; resStats?: any } = {}) {
+  if (!resStats) resStats = await gw3Client.getStats();
+  let resStatsData = resStats?.code === 200 ? resStats.data : null;
+
+  printUsagePercentage(resStatsData);
+  if (!resStatsData) return; // some API wrong;
+
+  if (
+    resStatsData.pinned_count / resStatsData.pinned_count_limit <
+      usageRatioThreshold &&
+    resStatsData.pinned_bytes / resStatsData.pinned_bytes_limit <
+      usageRatioThreshold &&
+    resStatsData.ipns / resStatsData.ipns_limit < usageRatioThreshold
+  )
+    return; // NO-OP if all metrics of usage are less than threshold
+
+  const authors = await dbApi.listRecentIPNSAuthors({
+    skip,
+    range: "5 years",
+  });
+  const started = Date.now();
+
+  const toPurged = [];
+  const accountStats = {
+    validCount: 0,
+    noIPNS: 0,
+    hasEthAddress: 0,
+    recentIPNS: 0,
+    skippedValidIPNS: 0,
+  };
+  let lIdx = 0;
+  while (
+    lIdx < authors.length &&
+    toPurged.length < 100 &&
+    accountStats.validCount < skip
+  ) {
+    const ent = authors[lIdx++];
+    if (
+      ent.ipnsKey == null || // ent.lastDataHash == null ||
+      ent.stats == null
+    ) {
+      accountStats.noIPNS++;
+      continue;
+    }
+
+    accountStats.validCount++;
+    if (+started - +ent.lastSeen <= 365 * 24 * 3600e3) {
+      accountStats.recentIPNS++;
+      continue;
+    } else if (ent.ethAddress != null) {
+      accountStats.hasEthAddress++;
+      continue;
+    } else if (ent.authorState !== "active" || ent.isRestricted) {
+      toPurged.push(ent);
+    }
+  }
+  console.log(
+    new Date(),
+    `scanned ${lIdx} authors, got ${toPurged.length} restricted accounts to purge:`,
+    accountStats
+  );
+
+  for (
+    let idx = authors.length - 1;
+    idx >= lIdx && toPurged.length < 100;
+    idx--
+  ) {
+    // pick up from backward from earliest
+    const ent = authors[idx];
+    if (ent.ipnsKey == null || ent.lastDataHash == null) {
+      accountStats.noIPNS++;
+      continue;
+    }
+    if (
+      +started - +ent.lastSeen <=
+      365 * 24 * 3600e3 // less than 1 year
+    ) {
+      accountStats.skippedValidIPNS++;
+      continue;
+    } else if (ent.ethAddress != null) {
+      accountStats.hasEthAddress++;
+      continue;
+    }
+    toPurged.push(ent);
+  }
+  console.log(
+    new Date(),
+    `fully scanned ${authors.length} authors, got ${toPurged.length} expired authors to purge:`,
+    accountStats,
+    toPurged
+  );
+
+  let cnt = 0;
+  for (const [idx, ent] of toPurged.entries()) {
+    console.log(new Date(), `purging ${idx}:`, ent);
+    const res = await gw3Client.getIpns(ent.ipnsKey);
+    if (res?.code === 200) cnt++;
+    await Promise.all([
+      gw3Client.rmIPNSName(ent.ipnsKey), // save number of IPNS
+      ent.isRestricted && ent.lastDataHash && gw3Client.rmPin(ent.lastDataHash), // save some number of pins & IPFS space
+    ]);
+
+    const [ret] = await dbApi.updateUserIPNSKey(
+      ent.authorId,
+      {
+        // lastDataHash: ent.lastDataHash,
+        // lastPublished: null,
+        isPurged: true,
+        // purgedAt: null
+      },
+      [
+        "testGw3IPNSKey",
+        "pem",
+        "useMattersIPNS",
+        "lastCidSize",
+        "lastCidSublinks",
+        "retriesAfterMissing",
+        "missingInLast50",
+      ]
+    );
+    console.log(new Date(), `${idx + 1}: purged:`, res, ret, ent);
+
+    await delay(2e3);
+  }
+
+  if (
+    resStatsData.pinned_count / resStatsData.pinned_count_limit >=
+      usageRatioThreshold ||
+    resStatsData.pinned_bytes / resStatsData.pinned_bytes_limit >=
+      usageRatioThreshold
+  )
+    await purgeGw3Pins({
+      skip:
+        Math.floor(
+          (resStatsData.pinned_count_limit / 2 + // beginning at middle point and add some +/- randomness;
+            10000 * (Math.random() - 0.5)) /
+            100
+        ) * 100, // align to multiple of 100s
+    });
+
+  resStats = await gw3Client.getStats();
+  resStatsData = resStats?.code === 200 ? resStats.data : null;
+
+  const ended = new Date();
+  console.log(
+    ended,
+    `elapsed ${((+ended - +started) / 60e3).toFixed(1)}m, purged ${
+      toPurged.length
+    } authors: removed ${cnt} ipns from gw3.`,
+    resStats
+  );
+  printUsagePercentage(resStatsData);
 }
 
 const ALLOWED_USER_STATES = new Set(["active", "onboarding", "frozen"]);
@@ -423,11 +865,13 @@ export async function refreshIPNSFeed(
     incremental = true,
     forceReplace = false,
     useMattersIPNS,
+    webfHost,
   }: {
     limit?: number;
     incremental?: boolean;
     forceReplace?: boolean;
     useMattersIPNS?: boolean;
+    webfHost?: string;
   } = {}
 ) {
   const [author] = await dbApi.getAuthor(userName);
@@ -487,10 +931,27 @@ export async function refreshIPNSFeed(
     );
   }
 
-  const feed = new AuthorFeed(author, ipnsKeyRec?.ipnsKey, drafts, articles);
+  if (webfHost === "") {
+    // reset
+    webfHost = undefined;
+  } else if (webfHost == null) {
+    console.log(new Date(), `setting webfHost:`, {
+      webfHost,
+      orig: ipnsKeyRec?.stats?.webfHost,
+    });
+    webfHost = ipnsKeyRec?.stats?.webfHost; // remember the settings from last time
+  }
+
+  const feed = new AuthorFeed({
+    author,
+    ipnsKey: ipnsKeyRec?.ipnsKey,
+    webfHost,
+    drafts,
+    articles,
+  });
   // console.log(new Date(), "get author feed:", feed);
   await feed.loadData();
-  const { html, xml, json } = feed.generate();
+  // const { html, xml, json } = feed.generate();
   // console.log(new Date(), "get author feed generated:", { html, xml, json });
 
   const kname = `matters-town-homepages-topdir-for-${author.userName}-${author.uuid}`;
@@ -544,34 +1005,47 @@ export async function refreshIPNSFeed(
 
   // console.log(new Date, `processing ${}'s last article:`, );
 
+  const dateSuffix = new Date().toISOString().substring(0, 13);
   const directoryName = `${kname}-with-${lastArti?.id || ""}-${
     lastArti?.slug || ""
-  }@${new Date().toISOString().substring(0, 13)}`;
+  }@${dateSuffix}`;
 
+  if (useMattersIPNS && ipnsKeyRec?.privKeyPem) {
+    console.log(
+      new Date(),
+      `use matters pre-generated keypair:`,
+      useMattersIPNS
+    );
+    keyPair.ipnsKey = ipnsKeyRec.ipnsKey;
+    keyPair.pem = ipnsKeyRec.privKeyPem;
+  } else if (!useMattersIPNS) {
+    // use the new generated key pair
+  } else if (ipnsKeyRec?.stats?.testGw3IPNSKey && ipnsKeyRec?.stats?.pem) {
+    keyPair.ipnsKey = ipnsKeyRec.stats.testGw3IPNSKey;
+    keyPair.pem = ipnsKeyRec.stats.pem;
+  }
+
+  // TO MOVE TO library
+  // const extraBundles = await feed.activityPubBundles(); // { author, // userName: author.userName, ipnsKey: keyPair.ipnsKey, });
   const contents = [
-    {
-      path: `${directoryName}/index.html`,
-      content: html,
-    },
-    {
-      path: `${directoryName}/rss.xml`,
-      content: xml,
-    },
-    {
-      path: `${directoryName}/feed.json`,
-      content: json,
-    },
-  ];
+    // { path: `${directoryName}/index.html`, content: html, },
+    // { path: `${directoryName}/rss.xml`, content: xml, },
+    // { path: `${directoryName}/feed.json`, content: json, },
+    ...(await feed.feedBundles()),
+    ...(await feed.activityPubBundles()),
+  ].map(({ path, content }) => ({
+    path: `${directoryName}/${path}`,
+    content,
+  }));
 
   const addEntries: [string, string][] = [];
   const promises: Promise<any>[] = [];
 
   const results = [];
-  let topDirHash = "";
   for await (const result of ipfs.addAll(contents)) {
     results.push(result);
     if (result.path === directoryName) {
-      topDirHash = result.cid?.toString();
+      // topDirHash = result.cid?.toString();
       promises.push(gw3Client.addPin(result.cid?.toString(), result.path));
     } else if (result.path.startsWith(directoryName) && !forceReplace) {
       // replace mode will start with this new topDirHash, no need to keep pinning files inside
@@ -581,6 +1055,26 @@ export async function refreshIPNSFeed(
       promises.push(gw3Client.addPin(result.cid?.toString(), result.path));
     }
   }
+
+  const topDirCid = results.find((r) => r.path === directoryName)?.cid;
+  if (!topDirCid) {
+    console.error(new Date(), "cannot find root cid", results);
+    return;
+  }
+  const topDirHash = topDirCid.toString();
+  const dagStream = await ipfs.dag.export(topDirCid);
+  console.log(new Date(), "dagStream:", dagStream);
+  // console.log(new Date(), "dagStream:", Readable.from(dagStream));
+  const bufs = [];
+  for await (const chunk of dagStream) {
+    // console.log(new Date(), `${bufs.length}:`, typeof chunk, chunk);
+    bufs.push(chunk);
+  }
+  const carFile = new Blob(bufs); // Buffer.concat(bufs);
+  console.log(new Date(), `got total ${bufs.length} chunks:`, carFile);
+  const resDagImport = await gw3Client.dagImport(carFile);
+  console.log(new Date(), "resDagImport:", resDagImport);
+
   await Promise.all(promises);
   promises.splice(0, promises.length);
 
@@ -686,13 +1180,63 @@ export async function refreshIPNSFeed(
     const rows = res.map((r) => (r.code === 200 ? r.data : r));
     console.log(new Date(), `pinning status:`, rows);
     rows.forEach((r) => {
-      if (r.status !== "pinning") waitCids.delete(r.cid);
+      // if (r.status === "pinned") waitCids.delete(r.cid);
+      switch (r?.status) {
+        case "pinned":
+        case "failure":
+          waitCids.delete(r.cid);
+      }
     });
     if (waitCids.size === 0) {
       console.log(new Date(), "all settled (pinned or failure).");
       break;
     }
     await delay(1000 * (5 + 20 * Math.random()));
+
+    if (i >= 7 && waitCids.size > 0) {
+      // at last rounds
+      // after 5 retries if there's still pending try dagImport some failed cids
+      // const [cid] = waitCids;
+      const cid =
+        Array.from(waitCids)[Math.floor(Math.random() * waitCids.size)]; // pick one randomly to dag import
+      console.log(
+        new Date(),
+        `still have ${waitCids.size} not pinned, trying dagImport:`,
+        cid
+      );
+
+      const dagStream = await ipfs.dag.export(CID.parse(cid));
+      console.log(new Date(), "dagStream:", dagStream);
+      // console.log(new Date(), "dagStream:", Readable.from(dagStream));
+      const bufs: Uint8Array[] = [];
+      try {
+        await Promise.race([
+          (async function () {
+            for await (const chunk of dagStream) {
+              // console.log(new Date(), `${bufs.length}:`, typeof chunk, chunk);
+              bufs.push(chunk);
+            }
+          })().catch((err) =>
+            console.error(new Date(), "read dagStream ERROR:", err)
+          ),
+          delay(130e3), // wait max 3minutes
+        ]);
+      } catch (err) {
+        console.log(`ERROR:`, err);
+      } finally {
+        console.log(new Date(), `got ${bufs.length} chunks.`);
+      }
+      if (bufs.length > 0) {
+        const carFile = new Blob(bufs); // Buffer.concat(bufs);
+        console.log(new Date(), `got total ${bufs.length} chunks:`, carFile);
+        const resDagImport = await gw3Client.dagImport(carFile);
+        console.log(new Date(), "resDagImport:", resDagImport);
+
+        const resData = await gw3Client.addPinWait(cid);
+        console.log(new Date(), `got pin again:`, { cid }, resData);
+        if (resData?.status === "pinned") waitCids.delete(cid);
+      }
+    }
   }
 
   console.log(
@@ -773,41 +1317,37 @@ export async function refreshIPNSFeed(
     // if (prior !== lastCid) gw3Client.rmPin(prior); // no need to wait, let it run async with best effort
   }
 
-  if (useMattersIPNS && ipnsKeyRec?.privKeyPem) {
-    console.log(
-      new Date(),
-      `use matters pre-generated keypair:`,
-      useMattersIPNS
-    );
-    keyPair.ipnsKey = ipnsKeyRec.ipnsKey;
-    keyPair.pem = ipnsKeyRec.privKeyPem;
-  } else if (!useMattersIPNS) {
-    // use the new generated key pair
-  } else if (ipnsKeyRec?.stats?.testGw3IPNSKey && ipnsKeyRec?.stats?.pem) {
-    keyPair.ipnsKey = ipnsKeyRec.stats.testGw3IPNSKey;
-    keyPair.pem = ipnsKeyRec.stats.pem;
-  }
-
   const testGw3IPNSKey = keyPair.ipnsKey; // imported.Id;
-  const resGetIpns1 = await gw3Client.getIpns(testGw3IPNSKey);
+  const resGetIpns1 = await gw3Client.getIpns(keyPair.ipnsKey);
   // console.log(new Date(), "ipns name get:", resGetIpns2);
-  console.log(new Date(), `ipns name get ${testGw3IPNSKey}:`, resGetIpns1);
+  console.log(new Date(), `ipns name get ${keyPair.ipnsKey}:`, resGetIpns1);
 
   let resIPNS;
 
-  const topAuthorDirName = `matters.town/@${author.userName}`;
+  const topAuthorDirName = `matters.town/@${author.userName}`; // ${ extraBundles.length > 0 ? `@${dateSuffix}` : "" }`;
+  {
+    // check & delete if exists
+    const res = await gw3Client.getIpnsByName(topAuthorDirName);
+    if (res?.code === 200 && res.data.name !== keyPair.ipnsKey) {
+      // name/rm
+      const res2 = await gw3Client.rmIPNSName(res.data.name);
+    }
+  }
+
   if (resGetIpns1?.code === 200) {
     // existed: do update
     if (resGetIpns1?.data.value === lastCid) {
       console.log(new Date(), `lastCid remained the same, no need to update:`, {
-        testGw3IPNSKey,
+        // testGw3IPNSKey,
+        keyPair, // .ipnsKey,
         lastCid,
+        ipnsKeyRec,
       });
       return ipnsKeyRec?.stats;
     }
 
     resIPNS = await gw3Client.updateIPNSName({
-      ipnsKey: testGw3IPNSKey,
+      ipnsKey: keyPair.ipnsKey,
       cid: lastCid,
     });
     console.log(new Date(), `updated ipns:`, resIPNS);
@@ -815,7 +1355,7 @@ export async function refreshIPNSFeed(
     // not existed: do import
 
     const importArgs = {
-      ipnsKey: testGw3IPNSKey,
+      ipnsKey: keyPair.ipnsKey,
       cid: lastCid,
       pem: keyPair.pem,
       alias: topAuthorDirName,
@@ -831,9 +1371,9 @@ export async function refreshIPNSFeed(
     return;
   }
 
-  const resGetIpns2 = await gw3Client.getIpns(testGw3IPNSKey);
+  const resGetIpns2 = await gw3Client.getIpns(keyPair.ipnsKey);
   // console.log(new Date(), "ipns name get:", resGetIpns2);
-  console.log(new Date(), `ipns name get ${testGw3IPNSKey}:`, resGetIpns2);
+  console.log(new Date(), `ipns name get ${keyPair.ipnsKey}:`, resGetIpns2);
 
   dagLinks = await gw3Client.getDAG(lastCid); // retrieve again
   console.log(
@@ -885,9 +1425,9 @@ export async function refreshIPNSFeed(
     missing: missingEntries.length,
     missingInLast50:
       missingEntries.length === 0 ? undefined : missingEntriesInLast50.length,
-    testGw3IPNSKey,
-    ipnsKey: testGw3IPNSKey,
-    pem: keyPair.pem,
+    ipnsKey: keyPair.ipnsKey, // testGw3IPNSKey,
+    privKeyPEM: keyPair.pem,
+    ...(useMattersIPNS ? null : { testGw3IPNSKey, pem: keyPair.pem }),
     pemName: kname,
     lastDataHash: lastCid,
     lastCidSize: lastCidData?.size,
@@ -901,6 +1441,7 @@ export async function refreshIPNSFeed(
         ? (ipnsKeyRec?.stats?.retriesAfterMissing ?? 0) + 1
         : undefined,
     useMattersIPNS: useMattersIPNS || undefined,
+    webfHost,
   };
   let ipnsKeyRecUpdated: Item = ipnsKeyRec!;
 
@@ -928,7 +1469,9 @@ export async function refreshIPNSFeed(
                 ? "missingInLast50"
                 : undefined,
             ],
-            [useMattersIPNS ? undefined : "useMattersIPNS"],
+            [useMattersIPNS ? ["testGw3IPNSKey", "pem"] : "useMattersIPNS"],
+            [webfHost == null ? "webfHost" : undefined],
+            "isPurged",
           ]
             .flat(Infinity)
             .filter(Boolean)
@@ -944,7 +1487,7 @@ export async function refreshIPNSFeed(
 
   console.log(
     new Date(),
-    `updated for author: '${author.displayName} (@${author.userName})': get ${articles.length} articles /${drafts.length} drafts`,
+    `updated for author: '${author.displayName} (@${author.userName})' at ${webfHost}: get ${articles.length} articles /${drafts.length} drafts`,
     missingEntriesInLast50.map(({ id, slug, dataHash }) => ({
       path: `${id}-${slug}`,
       dataHash,
