@@ -1,6 +1,6 @@
 import { Context, APIGatewayProxyResult, APIGatewayEvent } from "aws-lambda";
 
-import { refreshIPNSFeed } from "../lib/refresh-ipns-gw3.js";
+import { purgeIPNS, refreshIPNSFeed } from "../lib/refresh-ipns-gw3.js";
 import { dbApi, Item } from "../lib/db.js";
 
 export const handler = async (
@@ -40,7 +40,8 @@ export const handler = async (
     names = authors.map(({ userName }) => userName).filter(Boolean);
     console.log(
       new Date(),
-      `got latest author '${names}' fromrecent authors:`,
+      `got latest recent ${authors.length} authors:`,
+      names,
       authors
     );
   }
@@ -69,6 +70,8 @@ export const handler = async (
       );
     }
   }
+
+  await purgeIPNS();
 
   return {
     statusCode: 200,
