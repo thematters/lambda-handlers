@@ -2,6 +2,9 @@ import { getKnexClient, getPostgresJsClient } from "./utils/db.js";
 
 // main connection client
 
+const CLOUDFLARE_IMAGE_ENDPOINT = process.env.CLOUDFLARE_IMAGE_ENDPOINT || "";
+const MATTERS_AWS_S3_ENDPOINT = process.env.MATTERS_AWS_S3_ENDPOINT || "";
+
 const isTest = process.env.MATTERS_ENV === "test";
 const dbHost = process.env.MATTERS_PG_HOST || "";
 const dbUser = process.env.MATTERS_PG_USER || "";
@@ -48,7 +51,28 @@ export interface Article {
   state: string;
   authorState: string;
   lastReadAt?: Date;
+  userName?: string;
+  dataHash?: string;
 }
+
+export interface Item {
+  [key: string]: any;
+  id: string;
+}
+
+export const IMAGE_ASSET_TYPE = {
+  avatar: "avatar",
+  cover: "cover",
+  embed: "embed",
+  profileCover: "profileCover",
+  oauthClientAvatar: "oauthClientAvatar",
+  tagCover: "tagCover",
+  circleAvatar: "circleAvatar",
+  circleCover: "circleCover",
+  collectionCover: "collectionCover",
+  announcementCover: "announcementCover",
+  topicCover: "topicCover",
+} as const;
 
 export class DbApi {
   listArticles({
@@ -80,7 +104,7 @@ export class DbApi {
 SELECT * -- a.*, num_views, extract(epoch from last_read_at) AS last_read_timestamp
 FROM (
   SELECT -- draft.id,
-    a.id, a.title, a.summary, -- a.slug, a.draft_id, a.summary,
+    a.id, a.title, a.summary, a.slug, a.draft_id, a.summary, a.data_hash, user_name,
     draft.content, draft.author_id, a.created_at, a.state, author.state AS author_state, draft.publish_state
   FROM article a JOIN draft ON draft_id=draft.id -- AND article_id=article.id
   LEFT JOIN public.user author ON author.id=draft.author_id
@@ -106,22 +130,97 @@ ORDER BY ${orderBy === "lastRead" ? sql`last_read_at DESC NULLS LAST,` : sql``}
 LIMIT ${take} OFFSET ${skip} ; `;
   }
 
+  listRecentArticles({ take = 100, skip = 0, state = ["active"] } = {}) {
+    return sqlRO<[Item]>`-- list recent articles
+SELECT article.id, slug, title, summary, data_hash, user_name
+FROM public.article
+LEFT JOIN public.user author ON author_id=author.id
+WHERE article.state IN ('active') AND author.state NOT IN ('archived', 'bannded')
+ORDER BY article.id DESC
+LIMIT ${take} OFFSET ${skip} ;`;
+  }
+  listRecentArticlesToPublish({
+    userName = "",
+    take = 100,
+    skip = 0,
+    // state = ["active"],
+  } = {}) {
+    return sqlRO<[Item]>`-- list recent articles
+SELECT article.id, article.slug, article.title, article.summary, article.data_hash, user_name, draft.content, draft.tags, draft_id, article_id
+FROM public.article
+LEFT JOIN public.draft ON article_id=article.id
+LEFT JOIN public.user author ON article.author_id=author.id
+WHERE article.state IN ('active') AND author.state NOT IN ('archived', 'banned')
+  ${userName ? sqlRO`AND author.user_name IN (${userName})` : sqlRO``}
+  AND publish_state IN ('published')
+  AND article.data_hash IS NULL
+ORDER BY article.id DESC
+LIMIT ${take} OFFSET ${skip} ;`;
+  }
+  updateArticleDataMediaHash(
+    id: number | string,
+    { dataHash, mediaHash }: { dataHash: string; mediaHash: string }
+  ) {
+    return Promise.all([
+      sql<[Item]>`
+WITH cte AS ( SELECT id FROM public.article WHERE id IN (${id}) AND data_hash IS NULL AND media_hash IS NULL ORDER BY updated_at DESC LIMIT 1 )
+UPDATE public.article a SET data_hash=${dataHash}, media_hash=${mediaHash}
+FROM cte WHERE a.id=cte.id
+RETURNING * ;`,
+      sql<[Item]>`
+WITH cte AS ( SELECT id FROM public.draft WHERE article_id IN (${id}) AND data_hash IS NULL AND media_hash IS NULL ORDER BY updated_at DESC LIMIT 1 )
+UPDATE public.draft d SET data_hash=${dataHash}, media_hash=${mediaHash}
+FROM cte WHERE d.id=cte.id
+RETURNING * ;`,
+    ]);
+  }
+
+  listAuthorArticles({
+    authorId,
+    take = 50,
+    skip = 0,
+    state = ["active"],
+  }: {
+    authorId: string | number;
+    take?: number;
+    skip?: number;
+    state?: string[];
+  }) {
+    return sqlRO<
+      [Item]
+    >`SELECT * FROM public.article WHERE author_id=${authorId} AND state =ANY(${state}) ORDER BY id DESC LIMIT ${take} OFFSET ${skip};`;
+  }
+  listDrafts({
+    ids,
+    take = 50,
+    skip = 0,
+  }: {
+    ids: string[];
+    take?: number;
+    skip?: number;
+  }) {
+    return sqlRO<
+      [Item]
+    >`SELECT * FROM public.draft WHERE id=ANY(${ids}) AND article_id IS NOT NULL AND publish_state IN ('published') ORDER BY article_id DESC LIMIT ${take} OFFSET ${skip};`;
+  }
+
   listRecentAuthors({
-    limit = 5000,
+    limit = 100,
+    offset = 0,
     since = "2022-01-01",
-  }: { limit?: number; since?: string | Date } = {}) {
+  }: { limit?: number; offset?: number; since?: string | Date } = {}) {
     return sqlRO`-- check latest articles' author ipns_key
-SELECT u2.user_name, u2.display_name, COALESCE(u.last_at ::date, CURRENT_DATE) AS last_seen,
-  count_articles, ipns_key, last_data_hash AS top_dir_data_hash, last_published AS last_refreshed, t.*,
-  concat('https://matters.town/@', u2.user_name, '/', t.id, '-', t.slug) AS last_article_url,
+SELECT u2.user_name, u2.display_name, GREATEST(ul.last_at ::date, u2.last_seen ::date) AS last_seen,
+  count_articles, ipns_key, last_data_hash AS top_dir_data_hash, last_published, a.*,
+  concat('https://matters.town/@', u2.user_name, '/', a.id, '-', a.slug) AS last_article_url,
   priv_key_pem, priv_key_name
 FROM (
-  SELECT DISTINCT ON (author_id) author_id, id, title, slug, data_hash AS last_article_data_hash, media_hash, created_at AS last_article_published
+  SELECT DISTINCT ON (author_id) author_id, id, title, slug, summary, data_hash AS last_article_data_hash, media_hash, created_at AS last_article_published
   FROM article
-  WHERE state NOT IN ('archived', 'banned')
+  WHERE state IN ('active')
   ORDER BY author_id, id DESC
-) t
-LEFT JOIN mat_views.users_lasts u ON author_id=u.id
+) a
+LEFT JOIN mat_views.users_lasts ul ON author_id=ul.id
 LEFT JOIN public.user u2 ON author_id=u2.id
 LEFT JOIN user_ipns_keys k ON author_id=k.user_id
 LEFT JOIN (
@@ -130,12 +229,12 @@ LEFT JOIN (
   WHERE state NOT IN ('archived')
   GROUP BY 1
 ) ta USING (author_id)
--- WHERE u.state NOT IN ('archived')
--- WHERE user_name IN ('Brianliu', '...', 'oldcat')
-WHERE t.last_article_published >= ${since}
+-- WHERE -- WHERE user_name IN ('Brianliu', '...', 'oldcat')
+WHERE u2.state NOT IN ('archived', 'banned')
+  AND a.last_article_published >= ${since}
+  AND (last_published IS NULL OR last_published < a.last_article_published)
 ORDER BY id DESC
--- OFFSET floor(RANDOM() * 100 + 1)::int
--- LIMIT 5000 `;
+LIMIT ${limit} OFFSET ${offset} `;
   }
 
   listRecentUsers({
@@ -227,12 +326,78 @@ ORDER BY ${
 LIMIT ${take} OFFSET ${skip} ; `;
   }
 
+  getAuthor(userName: string) {
+    return sqlRO<
+      [Item?]
+    >`SELECT * FROM public.user WHERE user_name=${userName}`;
+  }
+  getUserIPNSKey(userId: string | number) {
+    return sqlRO<
+      [Item?]
+    >`SELECT * FROM public.user_ipns_keys WHERE user_id=${userId}`;
+  }
+  async findAssetUrl(id: string | number, cf_variant = "public") {
+    const [asset] = await sqlRO<
+      [Item?]
+    >`SELECT * FROM public.asset WHERE id=${id}`;
+    if (!asset) return null;
+
+    // genAssetUrl
+    const isImageType = Object.values(IMAGE_ASSET_TYPE).includes(
+      asset.type as any
+    );
+    return isImageType
+      ? `${CLOUDFLARE_IMAGE_ENDPOINT}/${asset.path}/${cf_variant}` // this.cfsvc.genUrl(asset.path)
+      : `${MATTERS_AWS_S3_ENDPOINT}/${asset.path}`;
+  }
+  updateUserIPNSKey(
+    userId: string | number,
+    stats: {
+      lastDataHash: string;
+      lastPublished?: string | Date;
+      [key: string]: any;
+    },
+    removeKeys: string[] = []
+  ) {
+    const { lastDataHash, lastPublished, ...rest } = stats;
+    return sql<
+      [Item?]
+    >`UPDATE public.user_ipns_keys SET last_data_hash=${lastDataHash}, stats=(COALESCE(stats, '{}' ::jsonb) - ${removeKeys} ::text[]) || ${
+      rest as any
+    } ::jsonb, updated_at=CURRENT_TIMESTAMP, last_published=COALESCE(${
+      lastPublished || null
+    }, CURRENT_TIMESTAMP) WHERE user_id=${userId} RETURNING * ;`;
+  }
+  upsertUserIPNSKey(
+    userId: string | number,
+    stats: {
+      lastDataHash: string;
+      lastPublished?: string | Date;
+      [key: string]: any;
+    },
+    removeKeys: string[] = []
+  ) {
+    const { ipnsKey, pemName, lastDataHash, lastPublished, ...rest } = stats;
+    return sql<[Item?]>`-- upsert new ipns record:
+INSERT INTO public.user_ipns_keys AS k(user_id, ipns_key, priv_key_pem, priv_key_name, last_data_hash, last_published, stats)
+VALUES(${userId}, ${ipnsKey}, ${stats?.pem}, ${pemName}, ${lastDataHash}, ${
+      lastPublished || null
+    }, ${rest as any})
+ON CONFLICT (user_id)
+DO UPDATE SET
+  last_data_hash=EXCLUDED.last_data_hash,
+  last_published=EXCLUDED.last_published,
+  stats=(COALESCE(k.stats, '{}' ::jsonb) - ${removeKeys} ::text[]) || EXCLUDED.stats,
+  updated_at=CURRENT_TIMESTAMP
+RETURNING * ;`;
+  }
+
   queryArticlesByUuid(uuids: string[]) {
     return sqlRO` SELECT id, title, slug, data_hash, media_hash, created_at FROM article WHERE uuid =ANY(${uuids}) `;
   }
 
   async checkVersion() {
-    const [{ version, now }] = await sql` SELECT VERSION(), NOW() `;
+    const [{ version, now }] = await sqlRO` SELECT VERSION(), NOW() `;
     console.log("pgres:", { version, now });
   }
 }
