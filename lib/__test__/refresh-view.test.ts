@@ -6,5 +6,5 @@ test("unexpected view", async () => {
 });
 
 test("expected view", async () => {
-  await refreshView("article_hottest_materialized");
+  await refreshView("user_activity_materialized");
 });
