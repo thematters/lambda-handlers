@@ -7,6 +7,7 @@ export const refreshView = async (view: string) => {
   await knex.raw(/*sql*/ `
     refresh materialized view concurrently ${view}
   `);
+  console.log(`Refreshed view: ${view}`);
 };
 
 enum MATERIALIZED_VIEW {
