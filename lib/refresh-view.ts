@@ -5,9 +5,9 @@ export const refreshView = async (view: string) => {
     throw Error(`Unexpected view name: ${view}`);
   }
   await knex.raw(/*sql*/ `
-    create unique index if not exists ${view}_id on public.${view} (id);
     refresh materialized view concurrently ${view}
   `);
+  console.log(`Refreshed view: ${view}`);
 };
 
 enum MATERIALIZED_VIEW {
