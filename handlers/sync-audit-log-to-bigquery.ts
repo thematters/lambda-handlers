@@ -24,7 +24,7 @@ const bigquery = new BigQuery({
 });
 
 export const handler = async (event: S3Event) => {
-  console.dir(event);
+  console.dir(event, {depth: null});
   const fileKey = event.Records[0].s3.object.key;
   if (!fileKey.includes("stdouterr.log")) {
     console.log(`${fileKey} skipped`);
