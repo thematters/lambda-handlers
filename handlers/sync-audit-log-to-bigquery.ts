@@ -12,14 +12,14 @@ const projectId = process.env.MATTERS_BIGQUERY_PROJECT_ID;
 const datasetId = process.env.MATTERS_BIGQUERY_DATASET_ID || "";
 const tableId = process.env.MATTERS_BIGQUERY_TABLE_ID || "";
 const clientEmail = process.env.MATTERS_BIGQUERY_CLIENT_EMAIL;
-const privateKey = process.env.MATTERS_BIGQUERY_PRIVATE_KEY;
+const privateKey = process.env.MATTERS_BIGQUERY_PRIVATE_KEY || "";
 
 const s3 = new S3({});
 const bigquery = new BigQuery({
   projectId,
   credentials: {
     client_email: clientEmail,
-    private_key: privateKey,
+    private_key: privateKey.replace(/\\n/g, '\n'),
   },
 });
 
