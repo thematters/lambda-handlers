@@ -19,7 +19,7 @@ const bigquery = new BigQuery({
   projectId,
   credentials: {
     client_email: clientEmail,
-    private_key: privateKey.replace(/\\n/g, '\n'),
+    private_key: privateKey.replace(/\\n/g, "\n"),
   },
 });
 
@@ -34,8 +34,13 @@ export const handler = async (event: S3Event) => {
   const response = await s3.getObject({ Bucket: bucket, Key: fileKey });
   const hash = event.Records[0].s3.object.eTag;
   const dst = "/tmp/" + hash + ".json";
-  await processAndDumpLocal(response, dst);
-  await uploadToBigQuery(dst);
+  const count = await processAndDumpLocal(response, dst);
+  if (count > 0) {
+    await uploadToBigQuery(dst);
+    console.log(`uploaded ${count} audit log entries to bigquery`);
+  } else {
+    console.log(`no augit log entries found`);
+  }
 };
 
 // helpers
@@ -51,9 +56,10 @@ const readFile = async (s3Response: GetObjectCommandOutput) => {
 const processAndDumpLocal = async (
   s3Response: GetObjectCommandOutput,
   dst: string
-) => {
+): Promise<number> => {
   const lineReader = await readFile(s3Response);
   const writeStream = fs.createWriteStream(dst);
+  let count = 0;
 
   for await (const line of lineReader) {
     const splits = line.split(" ");
@@ -66,6 +72,7 @@ const processAndDumpLocal = async (
     // const level = splits[4]
     const message = splits.slice(5).join(" ");
     if (label === auditLogLabel) {
+      count += 1;
       const data = JSON.parse(message);
       writeStream.write(
         JSON.stringify({
@@ -82,6 +89,7 @@ const processAndDumpLocal = async (
       );
     }
   }
+  return count;
 };
 
 const uploadToBigQuery = async (src: string) => {
