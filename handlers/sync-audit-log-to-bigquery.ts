@@ -1,6 +1,6 @@
-import type { S3Event, GetObjectCommandOutput } from "aws-lambda";
+import type { S3Event } from "aws-lambda";
 
-import { S3 } from "@aws-sdk/client-s3";
+import { S3, GetObjectCommandOutput } from "@aws-sdk/client-s3";
 import { BigQuery } from "@google-cloud/bigquery";
 
 import * as fs from "fs";
