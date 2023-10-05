@@ -222,9 +222,15 @@ const getSubject = (
 ): string => {
   const subjects = {
     NEWUSER: {
-      zh_hant: (displayName ? `${displayName}，剛來到`: '歡迎來到') + '馬特市，想與你分享 Matters 的小秘密',
-      zh_hans: (displayName ? `${displayName}，刚來到`: '欢迎来到') + '马特市，想与你分享 Matters 的小秘密',
-      en: (displayName ? `${displayName}，剛來到`: '歡迎來到') + '馬特市，想與你分享 Matters 的小秘密'
+      zh_hant:
+        (displayName ? `${displayName}，剛來到` : "歡迎來到") +
+        "馬特市，想與你分享 Matters 的小秘密",
+      zh_hans:
+        (displayName ? `${displayName}，刚來到` : "欢迎来到") +
+        "马特市，想与你分享 Matters 的小秘密",
+      en:
+        (displayName ? `${displayName}，剛來到` : "歡迎來到") +
+        "馬特市，想與你分享 Matters 的小秘密",
     },
     ACTIVE: {
       zh_hant: `${displayName}，在你離開 Matters 的期間， 我們為你整理了精彩內容`,

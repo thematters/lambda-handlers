@@ -24,7 +24,7 @@ const bigquery = new BigQuery({
 });
 
 export const handler = async (event: S3Event) => {
-  console.dir(event, {depth: null});
+  console.dir(event, { depth: null });
   const fileKey = event.Records[0].s3.object.key;
   if (!fileKey.includes("stdouterr.log")) {
     console.log(`${fileKey} skipped`);
@@ -32,7 +32,8 @@ export const handler = async (event: S3Event) => {
   }
   const bucket = event.Records[0].s3.bucket.name;
   const response = await s3.getObject({ Bucket: bucket, Key: fileKey });
-  const dst = "/tmp/" + fileKey + ".json";
+  const hash = event.Records[0].s3.object.eTag;
+  const dst = "/tmp/" + hash + ".json";
   await processAndDumpLocal(response, dst);
   await uploadToBigQuery(dst);
 };
@@ -47,7 +48,10 @@ const readFile = async (s3Response: GetObjectCommandOutput) => {
   });
 };
 
-const processAndDumpLocal = async (s3Response: GetObjectCommandOutput, dst: string) => {
+const processAndDumpLocal = async (
+  s3Response: GetObjectCommandOutput,
+  dst: string
+) => {
   const lineReader = await readFile(s3Response);
   const writeStream = fs.createWriteStream(dst);
 
