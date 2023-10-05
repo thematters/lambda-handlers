@@ -1,4 +1,4 @@
-import type { S3Event } from "aws-lambda";
+import type { S3Event, GetObjectCommandOutput } from "aws-lambda";
 
 import { S3 } from "@aws-sdk/client-s3";
 import { BigQuery } from "@google-cloud/bigquery";
@@ -13,7 +13,6 @@ const datasetId = process.env.MATTERS_BIGQUERY_DATASET_ID || "";
 const tableId = process.env.MATTERS_BIGQUERY_TABLE_ID || "";
 const clientEmail = process.env.MATTERS_BIGQUERY_CLIENT_EMAIL;
 const privateKey = process.env.MATTERS_BIGQUERY_PRIVATE_KEY;
-const s3Bucket = process.env.MATTERS_S3_BUCKET || "";
 
 const s3 = new S3({});
 const bigquery = new BigQuery({
@@ -25,31 +24,31 @@ const bigquery = new BigQuery({
 });
 
 export const handler = async (event: S3Event) => {
-  console.log(event);
+  console.dir(event);
   const fileKey = event.Records[0].s3.object.key;
   if (!fileKey.includes("stdouterr.log")) {
     console.log(`${fileKey} skipped`);
     return;
   }
-  const dst = "/tmp/" + event.Records[0].s3.object.key + ".json";
-  await processAndDumpLocal(fileKey, dst);
+  const bucket = event.Records[0].s3.bucket.name;
+  const response = await s3.getObject({ Bucket: bucket, Key: fileKey });
+  const dst = "/tmp/" + fileKey + ".json";
+  await processAndDumpLocal(response, dst);
   await uploadToBigQuery(dst);
 };
 
 // helpers
 
-const readFile = async (path: string) => {
-  const response = await s3.getObject({ Bucket: s3Bucket, Key: path });
-  const stream = response.Body as NodeJS.ReadableStream;
-
+const readFile = async (s3Response: GetObjectCommandOutput) => {
+  const stream = s3Response.Body as NodeJS.ReadableStream;
   return createInterface({
     input: stream.pipe(createGunzip()),
     crlfDelay: Infinity,
   });
 };
 
-const processAndDumpLocal = async (src: string, dst: string) => {
-  const lineReader = await readFile(src);
+const processAndDumpLocal = async (s3Response: GetObjectCommandOutput, dst: string) => {
+  const lineReader = await readFile(s3Response);
   const writeStream = fs.createWriteStream(dst);
 
   for await (const line of lineReader) {
