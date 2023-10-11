@@ -86,6 +86,7 @@ const processAndDumpLocal = async (
           request_id: requestId ? requestId.slice(0, 36) : undefined,
           ip: data.ip ? data.ip.slice(0, 45) : undefined,
           user_agent: data.userAgent ? data.userAgent.slice(0, 255) : undefined,
+          remark: data.remark ? data.remark.slice(0, 255) : undefined,
           created_at: timestamp,
         }) + "\n"
       );
