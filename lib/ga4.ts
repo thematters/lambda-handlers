@@ -4,7 +4,7 @@ import { pgKnexRO as knexRO, pgKnex as knex } from "./db.js";
 
 const propertyId = process.env.MATTERS_GA4_PROPERTY_ID;
 
-const analyticsDataClient = new BetaAnalyticsDataClient();
+export const TABLE_NAME = "article_ga4_data";
 
 interface Row {
   path: string;
@@ -15,6 +15,11 @@ interface MergedData {
   [key: string]: number;
 }
 
+export const getLocalDateString = (date: Date) => {
+  // return utc+8 date string in YYYY-MM-DD format
+  return date.toLocaleDateString("sv", { timeZone: "Asia/Taipei" });
+};
+
 export const fetchGA4Data = async ({
   startDate,
   endDate,
@@ -22,11 +27,15 @@ export const fetchGA4Data = async ({
   startDate: string;
   endDate: string;
 }): Promise<Row[]> => {
+  const analyticsDataClient = new BetaAnalyticsDataClient();
   const limit = 10000;
   let offset = 0;
   const result: Row[] = [];
-  while (true) {
-    const res = await request({ startDate, endDate, limit, offset });
+  for (;;) {
+    const res = await request(
+      { startDate, endDate, limit, offset },
+      analyticsDataClient
+    );
     result.push(...res);
     offset += limit;
     if (res.length < limit) {
@@ -45,11 +54,10 @@ export const saveGA4Data = async (
     totalUsers,
     dateRange: `[${startDate}, ${endDate}]`,
   }));
-  const table = "article_ga4_data";
   const updateRows = [];
   const insertRows = [];
   for (const { articleId, dateRange, totalUsers } of rows) {
-    const res = await knexRO(table)
+    const res = await knexRO(TABLE_NAME)
       .where({ articleId, dateRange })
       .select("id", "totalUsers")
       .first();
@@ -64,11 +72,11 @@ export const saveGA4Data = async (
   }
   if (updateRows.length > 0) {
     for (const { id, totalUsers } of updateRows) {
-      await knex(table).update({ totalUsers }).where({ id: id });
+      await knex(TABLE_NAME).update({ totalUsers }).where({ id: id });
     }
   }
   if (insertRows.length > 0) {
-    await knex(table).insert(insertRows);
+    await knex(TABLE_NAME).insert(insertRows);
   }
 };
 
@@ -117,18 +125,21 @@ const hashToId = async (hash: string) => {
 };
 
 // https://developers.google.com/analytics/devguides/reporting/data/v1
-const request = async ({
-  startDate,
-  endDate,
-  limit,
-  offset,
-}: {
-  startDate: string;
-  endDate: string;
-  limit: number;
-  offset: number;
-}): Promise<Row[]> => {
-  const [response] = await analyticsDataClient.runReport({
+const request = async (
+  {
+    startDate,
+    endDate,
+    limit,
+    offset,
+  }: {
+    startDate: string;
+    endDate: string;
+    limit: number;
+    offset: number;
+  },
+  client: BetaAnalyticsDataClient
+): Promise<Row[]> => {
+  const [response] = await client.runReport({
     property: `properties/${propertyId}`,
     dateRanges: [
       {

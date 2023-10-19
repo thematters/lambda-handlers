@@ -1,4 +1,9 @@
-import { fetchGA4Data, convertAndMerge, saveGA4Data } from "../lib/ga4.js";
+import {
+  fetchGA4Data,
+  convertAndMerge,
+  saveGA4Data,
+  getLocalDateString,
+} from "../lib/ga4.js";
 
 // envs
 
@@ -10,21 +15,17 @@ type Event = {
   };
 };
 
-// set timezone to UTC+8
-process.env.TZ = "Asia/Taipei";
-
-const getDate = (type: Event["data"]["type"]) => {
+const getDate = (type: "today" | "yesterday") => {
   const date = new Date();
   if (type === "yesterday") {
     date.setDate(date.getDate() - 1);
   }
-  return date;
+  return getLocalDateString(date);
 };
 
 export const handler = async (event: Event) => {
   const { type } = event.data;
-  const date = getDate(type);
-  const startDate = date.toISOString().slice(0, 10);
+  const startDate = getDate(type);
   const endDate = startDate;
   const data = await fetchGA4Data({ startDate, endDate });
   const convertedData = await convertAndMerge(data);
