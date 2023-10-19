@@ -3,6 +3,9 @@ import { BetaAnalyticsDataClient } from "@google-analytics/data";
 import { pgKnexRO as knexRO, pgKnex as knex } from "./db.js";
 
 const propertyId = process.env.MATTERS_GA4_PROPERTY_ID;
+const projectId = process.env.MATTERS_GA4_PROJECT_ID;
+const clientEmail = process.env.MATTERS_GA4_CLIENT_EMAIL;
+const privateKey = process.env.MATTERS_GA4_PRIVATE_KEY || "";
 
 export const TABLE_NAME = "article_ga4_data";
 
@@ -27,7 +30,13 @@ export const fetchGA4Data = async ({
   startDate: string;
   endDate: string;
 }): Promise<Row[]> => {
-  const analyticsDataClient = new BetaAnalyticsDataClient();
+  const analyticsDataClient = new BetaAnalyticsDataClient({
+    projectId,
+    credentials: {
+      client_email: clientEmail,
+      private_key: privateKey.replace(/\\n/g, "\n"),
+    },
+  });
   const limit = 10000;
   let offset = 0;
   const result: Row[] = [];

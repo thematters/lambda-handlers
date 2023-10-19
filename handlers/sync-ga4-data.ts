@@ -6,6 +6,10 @@ import {
 } from "../lib/ga4.js";
 
 // envs
+// MATTERS_GA4_PROPERTY_ID;
+// MATTERS_GA4_PROJECT_ID;
+// MATTERS_GA4_CLIENT_EMAIL;
+// MATTERS_GA4_PRIVATE_KEY;
 
 // AWS EventBridge can configure the input event sent to Lambda,
 // see https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-transform-target-input.html for info.
