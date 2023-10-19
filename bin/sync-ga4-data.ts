@@ -1,15 +1,13 @@
 import fs from "fs";
+import { fetchGA4Data, convertAndMerge, saveGA4Data } from "../lib/ga4.js";
 
-import { convertAndMerge, saveGA4Data } from "../lib/ga4.js";
+const main = async () => {
+  const startDate = "2021-10-15";
+  const endDate = "2023-10-19";
+  const data = await fetchGA4Data({ startDate, endDate });
+  fs.writeFileSync("./data.json", JSON.stringify(data));
+  const convertedData = await convertAndMerge(data);
+  await saveGA4Data(convertedData, { startDate, endDate });
+};
 
-// const data = JSON.parse(fs.readFileSync("data.json", "utf8"));
-// convertAndMerge(data).then(console.log);
-
-saveGA4Data(
-  { "3": 1, "2": 4 },
-  { startDate: "2021-10-29", endDate: "2021-10-29" }
-).then(console.log);
-
-//fetchData({startDate: '2021-10-29', endDate: '2021-10-29'}).then(res => {
-//	fs.writeFileSync('data.json', JSON.stringify(res, null, 2))
-//});
+main();
