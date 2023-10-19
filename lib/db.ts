@@ -5,12 +5,10 @@ import { getKnexClient, getPostgresJsClient } from "./utils/db.js";
 const CLOUDFLARE_IMAGE_ENDPOINT = process.env.CLOUDFLARE_IMAGE_ENDPOINT || "";
 const MATTERS_AWS_S3_ENDPOINT = process.env.MATTERS_AWS_S3_ENDPOINT || "";
 
-const isTest = process.env.MATTERS_ENV === "test";
 const dbHost = process.env.MATTERS_PG_HOST || "";
 const dbUser = process.env.MATTERS_PG_USER || "";
 const dbPasswd = process.env.MATTERS_PG_PASSWORD || "";
-const _dbName = process.env.MATTERS_PG_DATABASE || "";
-const dbName = isTest ? "test_" + _dbName : _dbName;
+const dbName = process.env.MATTERS_PG_DATABASE || "";
 
 const databaseURL =
   process.env.PG_CONNECTION_STRING ||
