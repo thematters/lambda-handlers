@@ -80,8 +80,12 @@ const processAndDumpLocal = async (
           action: data.action ? data.action.slice(0, 50) : undefined,
           entity: data.entity ? data.entity.slice(0, 50) : undefined,
           entity_id: data.entityId,
-          old_value: data.oldValue ? String(data.oldValue).slice(0, 255) : undefined,
-          new_value: data.newValue ? String(data.newValue).slice(0, 255) : undefined,
+          old_value: data.oldValue
+            ? String(data.oldValue).slice(0, 255)
+            : undefined,
+          new_value: data.newValue
+            ? String(data.newValue).slice(0, 255)
+            : undefined,
           status: data.status.slice(0, 10),
           request_id: requestId ? requestId.slice(0, 36) : undefined,
           ip: data.ip ? data.ip.slice(0, 45) : undefined,

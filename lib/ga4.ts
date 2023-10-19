@@ -46,8 +46,8 @@ export const saveGA4Data = async (
     dateRange: `[${startDate}, ${endDate}]`,
   }));
   const table = "article_ga4_data";
-  const updateRows = []
-  const insertRows = []
+  const updateRows = [];
+  const insertRows = [];
   for (const { articleId, dateRange, totalUsers } of rows) {
     const res = await knexRO(table)
       .where({ articleId, dateRange })
@@ -56,15 +56,15 @@ export const saveGA4Data = async (
     if (res && res.totalUsers) {
       if (res.totalUsers !== String(totalUsers)) {
         // only update when totalUsers is different
-	updateRows.push({id: res.id, totalUsers})
+        updateRows.push({ id: res.id, totalUsers });
       }
     } else {
       insertRows.push({ articleId, dateRange, totalUsers });
     }
   }
   if (updateRows.length > 0) {
-    for (const {id, totalUsers} of updateRows) {
-      await knex(table).update({totalUsers}).where({id: id})
+    for (const { id, totalUsers } of updateRows) {
+      await knex(table).update({ totalUsers }).where({ id: id });
     }
   }
   if (insertRows.length > 0) {
