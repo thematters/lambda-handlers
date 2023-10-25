@@ -237,6 +237,31 @@ ORDER BY id DESC
 LIMIT ${limit} OFFSET ${offset} `;
   }
 
+  listRecentIPNSAuthors({
+    skip = 10000,
+    range = "1 year",
+    userIds,
+  }: { skip?: number; range?: string; userIds?: [string | number] } = {}) {
+    return sqlRO`-- get authors' IPNS usage order
+SELECT user_name, display_name, author.state AS author_state, author.last_seen, eth_address,
+  ipns_key, last_data_hash,
+  (author.state != 'active' OR author_id IN (SELECT user_id FROM user_restriction)) AS is_restricted,
+  article.*, k.stats
+FROM (
+  SELECT DISTINCT ON (author_id) author_id ::int,
+    article.id ::int, title, state AS article_state, article.created_at
+  FROM public.article
+  ORDER BY author_id, id DESC
+) article
+LEFT JOIN public.user author ON author_id=author.id
+LEFT JOIN public.user_ipns_keys k ON user_id=author.id
+WHERE (stats->'isPurged')::bool IS NOT true
+  -- AND author.last_seen >= CURRENT_DATE - $ {range}::interval
+  ${Array.isArray(userIds) ? sqlRO`AND user_id=ANY(${userIds})` : sqlRO``}
+  AND article.created_at >= CURRENT_DATE - ${range}::interval
+ORDER BY article.id DESC -- LIMIT 13000`;
+  }
+
   listRecentUsers({
     take = 5,
     skip = 0,
@@ -353,20 +378,29 @@ LIMIT ${take} OFFSET ${skip} ; `;
   updateUserIPNSKey(
     userId: string | number,
     stats: {
-      lastDataHash: string;
+      lastDataHash?: string;
       lastPublished?: string | Date;
       [key: string]: any;
     },
     removeKeys: string[] = []
   ) {
-    const { lastDataHash, lastPublished, ...rest } = stats;
-    return sql<
-      [Item?]
-    >`UPDATE public.user_ipns_keys SET last_data_hash=${lastDataHash}, stats=(COALESCE(stats, '{}' ::jsonb) - ${removeKeys} ::text[]) || ${
+    const {
+      lastDataHash = null,
+      lastPublished = null,
+      // isPurged,
+      ...rest
+    } = stats;
+    return sql<[Item?]>`-- update ipns_keys entry
+UPDATE public.user_ipns_keys
+SET last_data_hash=${lastDataHash}, last_published=${lastPublished},
+  stats=${
+    // false // isPurged ? null :
+    sql`(COALESCE(stats, '{}' ::jsonb) - ${removeKeys} ::text[]) || ${
       rest as any
-    } ::jsonb, updated_at=CURRENT_TIMESTAMP, last_published=COALESCE(${
-      lastPublished || null
-    }, CURRENT_TIMESTAMP) WHERE user_id=${userId} RETURNING * ;`;
+    } ::jsonb`
+  },
+  updated_at=CURRENT_TIMESTAMP
+WHERE user_id=${userId} RETURNING * ;`;
   }
   upsertUserIPNSKey(
     userId: string | number,

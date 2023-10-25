@@ -1,10 +1,10 @@
-import { generateKeyPair } from "crypto";
+import { generateKeyPair } from "node:crypto";
+import { promisify } from "node:util";
 
 import { Readable } from "node:stream";
 // import FormData from "form-data";
 import { create } from "ipfs-http-client";
 // import { Readable } from 'stream'
-import { promisify } from "util";
 
 const generateKeyPairPromisified = promisify(generateKeyPair);
 

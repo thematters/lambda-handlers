@@ -1,4 +1,5 @@
 import path from "node:path";
+
 import shuffle from "lodash/shuffle.js";
 
 import { AuthorFeed } from "../lib/author-feed-ipns.js";
@@ -192,14 +193,25 @@ class GW3Client {
     return res.json();
   }
 
-  async updateIPNSName({ ipnsKey, cid }: { ipnsKey: string; cid: string }) {
-    const res = await fetch(
-      `https://gw3.io/api/v0/name/publish?key=${ipnsKey}&arg=${cid}&ts=${getTs()}`,
-      {
-        method: "POST",
-        headers: this.#authHeaders, // this.#makeAuthHeaders(),
-      }
+  async updateIPNSName({
+    ipnsKey,
+    cid,
+    pin,
+  }: {
+    ipnsKey: string;
+    cid: string;
+    pin?: boolean;
+  }) {
+    const u = new URL(
+      `https://gw3.io/api/v0/name/publish?key=${ipnsKey}&arg=${cid}&ts=${getTs()}`
     );
+    if (pin === true || pin === false)
+      // not undefined
+      u.searchParams.set("pin", `${pin}`);
+    const res = await fetch(u, {
+      method: "POST",
+      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+    });
 
     console.log(
       new Date(),
@@ -253,6 +265,18 @@ class GW3Client {
     return res.json();
   }
 
+  async rmIPNSName(kid: string) {
+    const u = new URL(`${this.#config.baseURL}/api/v0/name/rm?ts=${getTs()}`);
+    u.searchParams.set("key", kid);
+    const res = await fetch(u, {
+      method: "POST",
+      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+    });
+    // console.log(new Date(), "rmIPNS res:", res.ok, res.status, res.headers);
+
+    return res.json();
+  }
+
   async getIpns(kid: string) {
     const u = `${GW3_ACCOUNT_API_BASE_URL}/api/v0/ipns/${kid}?ts=${getTs()}`;
     const res = await fetch(u, {
@@ -260,6 +284,37 @@ class GW3Client {
       headers: this.#authHeaders, // this.#makeAuthHeaders(),
     });
     // console.log(new Date(), "getPin res:", res.ok, res.status, res.headers);
+
+    return res.json();
+  }
+
+  async getIpnsByName(alias: string) {
+    const u = new URL(
+      `${GW3_ACCOUNT_API_BASE_URL}/api/v0/ipns/search?ts=${getTs()}`
+    );
+    u.searchParams.set("alias", alias);
+    const res = await fetch(u, {
+      method: "GET",
+      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+    });
+    console.log(
+      new Date(),
+      "search IPNS res:",
+      res.ok,
+      res.status,
+      res.headers
+    );
+
+    return res.json();
+  }
+
+  async getStats() {
+    const u = new URL(`${GW3_ACCOUNT_API_BASE_URL}/api/v0/stats?ts=${getTs()}`);
+    const res = await fetch(u, {
+      method: "GET",
+      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+    });
+    // console.log( new Date(), "get usage stats res:", res.ok, res.status, res.headers);
 
     return res.json();
   }
@@ -360,13 +415,15 @@ export async function refreshPinLatest({ limit = 100, offset = 0 } = {}) {
     toAddEntries
   );
   let newTopDir = EMPTY_DAG_ROOT; // starts from empty
+  let mergedCount = 0;
   while (toAddEntries?.length > 0) {
     await gw3Client.importFolder(newTopDir);
 
+    const add = toAddEntries.splice(0, 50); // gw3 API changed the limit to 50 since 8/28
     const resFolderOps = await gw3Client.callFolderOperation(newTopDir, {
-      add: toAddEntries.splice(0, 50), // gw3 API changed the limit to 50 since 8/28
+      add,
       pin_new: true,
-      unpin_old: true,
+      unpin_old: newTopDir === EMPTY_DAG_ROOT ? undefined : true,
     });
     console.log(
       new Date(),
@@ -381,6 +438,8 @@ export async function refreshPinLatest({ limit = 100, offset = 0 } = {}) {
       );
       break;
     }
+    mergedCount += add.length;
+
     // const prior = lastCid;
     newTopDir = resFolderOps.data.cid;
   }
@@ -395,7 +454,8 @@ export async function refreshPinLatest({ limit = 100, offset = 0 } = {}) {
   console.log(
     new Date(),
     `merged ${stats["pinned"]} cids into one, with ${toAddEntries.length} left, unpin all pinned sub-links.`,
-    newTopDir
+    newTopDir,
+    mergedCount
   );
 
   // unpin all sub-links
@@ -412,6 +472,87 @@ export async function refreshPinLatest({ limit = 100, offset = 0 } = {}) {
   );
 
   gw3Client.addPin(EMPTY_DAG_ROOT, "EMPTY_DAG_ROOT");
+
+  gw3Client.renamePin(
+    newTopDir,
+    `matters-town-collection-${mergedCount}-articles-${articles?.[0].id}-to-${
+      articles.slice(-1)?.[0].id
+    }`
+  );
+}
+
+export async function purgeIPNS({ skip = 10000 } = {}) {
+  const authors = await dbApi.listRecentIPNSAuthors({
+    skip: 10000,
+    range: "2 years",
+  });
+  const started = Date.now();
+
+  const toPurged = authors
+    .filter(
+      (ent, idx) =>
+        ent.ipnsKey !== null &&
+        ent.stats !== null &&
+        !(started - +ent.lastSeen <= 365 * 24 * 3600e3) &&
+        (ent.authorState !== "active" || ent.isRestricted)
+    )
+    .slice(0, 100);
+  for (let idx = authors.length - 1; idx >= 0 && toPurged.length < 100; idx--) {
+    // pick up from backward from earliest
+    const ent = authors[idx];
+    if (
+      ent.ipnsKey != null &&
+      ent.stats != null &&
+      ent.ethAddress == null &&
+      !(started - +ent.lastSeen <= 365 * 24 * 3600e3) // less than 1 year
+    )
+      toPurged.push(ent);
+  }
+  console.log(new Date(), `got ${authors.length} authors:`, toPurged);
+
+  let cnt = 0;
+  for (const [idx, ent] of toPurged.entries()) {
+    console.log(new Date(), `purging ${idx}:`, ent);
+    const res = await gw3Client.getIpns(ent.ipnsKey);
+    if (res?.code === 200) cnt++;
+    await Promise.all([
+      gw3Client.rmIPNSName(ent.ipnsKey), // save number of IPNS
+      ent.isRestricted && ent.lastDataHash && gw3Client.rmPin(ent.lastDataHash), // save some number of pins & IPFS space
+    ]);
+
+    const [ret] = await dbApi.updateUserIPNSKey(
+      ent.authorId,
+      {
+        // lastDataHash: ent.lastDataHash,
+        // lastPublished: null,
+        isPurged: true,
+        // purgedAt: null
+      },
+      [
+        "testGw3IPNSKey",
+        "pem",
+        "useMattersIPNS",
+        "lastCidSize",
+        "lastCidSublinks",
+        "retriesAfterMissing",
+        "missingInLast50",
+      ]
+    );
+    console.log(new Date(), `${idx + 1}: purged:`, res, ret, ent);
+
+    await delay(2e3);
+  }
+
+  const resStats = await gw3Client.getStats();
+
+  const ended = new Date();
+  console.log(
+    ended,
+    `elapsed ${((+ended - started) / 60e3).toFixed(1)}m, purged ${
+      toPurged.length
+    } authors: removed ${cnt} ipns from gw3.`,
+    resStats
+  );
 }
 
 const ALLOWED_USER_STATES = new Set(["active", "onboarding", "frozen"]);
@@ -423,11 +564,13 @@ export async function refreshIPNSFeed(
     incremental = true,
     forceReplace = false,
     useMattersIPNS,
+    webfHost,
   }: {
     limit?: number;
     incremental?: boolean;
     forceReplace?: boolean;
     useMattersIPNS?: boolean;
+    webfHost?: string;
   } = {}
 ) {
   const [author] = await dbApi.getAuthor(userName);
@@ -487,10 +630,27 @@ export async function refreshIPNSFeed(
     );
   }
 
-  const feed = new AuthorFeed(author, ipnsKeyRec?.ipnsKey, drafts, articles);
+  if (webfHost === "") {
+    // reset
+    webfHost = undefined;
+  } else if (webfHost == null) {
+    console.log(new Date(), `setting webfHost:`, {
+      webfHost,
+      orig: ipnsKeyRec?.stats?.webfHost,
+    });
+    webfHost = ipnsKeyRec?.stats?.webfHost; // remember the settings from last time
+  }
+
+  const feed = new AuthorFeed({
+    author,
+    ipnsKey: ipnsKeyRec?.ipnsKey,
+    webfHost,
+    drafts,
+    articles,
+  });
   // console.log(new Date(), "get author feed:", feed);
   await feed.loadData();
-  const { html, xml, json } = feed.generate();
+  // const { html, xml, json } = feed.generate();
   // console.log(new Date(), "get author feed generated:", { html, xml, json });
 
   const kname = `matters-town-homepages-topdir-for-${author.userName}-${author.uuid}`;
@@ -544,24 +704,38 @@ export async function refreshIPNSFeed(
 
   // console.log(new Date, `processing ${}'s last article:`, );
 
+  const dateSuffix = new Date().toISOString().substring(0, 13);
   const directoryName = `${kname}-with-${lastArti?.id || ""}-${
     lastArti?.slug || ""
-  }@${new Date().toISOString().substring(0, 13)}`;
+  }@${dateSuffix}`;
 
+  if (useMattersIPNS && ipnsKeyRec?.privKeyPem) {
+    console.log(
+      new Date(),
+      `use matters pre-generated keypair:`,
+      useMattersIPNS
+    );
+    keyPair.ipnsKey = ipnsKeyRec.ipnsKey;
+    keyPair.pem = ipnsKeyRec.privKeyPem;
+  } else if (!useMattersIPNS) {
+    // use the new generated key pair
+  } else if (ipnsKeyRec?.stats?.testGw3IPNSKey && ipnsKeyRec?.stats?.pem) {
+    keyPair.ipnsKey = ipnsKeyRec.stats.testGw3IPNSKey;
+    keyPair.pem = ipnsKeyRec.stats.pem;
+  }
+
+  // TO MOVE TO library
+  // const extraBundles = await feed.activityPubBundles(); // { author, // userName: author.userName, ipnsKey: keyPair.ipnsKey, });
   const contents = [
-    {
-      path: `${directoryName}/index.html`,
-      content: html,
-    },
-    {
-      path: `${directoryName}/rss.xml`,
-      content: xml,
-    },
-    {
-      path: `${directoryName}/feed.json`,
-      content: json,
-    },
-  ];
+    // { path: `${directoryName}/index.html`, content: html, },
+    // { path: `${directoryName}/rss.xml`, content: xml, },
+    // { path: `${directoryName}/feed.json`, content: json, },
+    ...(await feed.feedBundles()),
+    ...(await feed.activityPubBundles()),
+  ].map(({ path, content }) => ({
+    path: `${directoryName}/${path}`,
+    content,
+  }));
 
   const addEntries: [string, string][] = [];
   const promises: Promise<any>[] = [];
@@ -773,21 +947,6 @@ export async function refreshIPNSFeed(
     // if (prior !== lastCid) gw3Client.rmPin(prior); // no need to wait, let it run async with best effort
   }
 
-  if (useMattersIPNS && ipnsKeyRec?.privKeyPem) {
-    console.log(
-      new Date(),
-      `use matters pre-generated keypair:`,
-      useMattersIPNS
-    );
-    keyPair.ipnsKey = ipnsKeyRec.ipnsKey;
-    keyPair.pem = ipnsKeyRec.privKeyPem;
-  } else if (!useMattersIPNS) {
-    // use the new generated key pair
-  } else if (ipnsKeyRec?.stats?.testGw3IPNSKey && ipnsKeyRec?.stats?.pem) {
-    keyPair.ipnsKey = ipnsKeyRec.stats.testGw3IPNSKey;
-    keyPair.pem = ipnsKeyRec.stats.pem;
-  }
-
   const testGw3IPNSKey = keyPair.ipnsKey; // imported.Id;
   const resGetIpns1 = await gw3Client.getIpns(testGw3IPNSKey);
   // console.log(new Date(), "ipns name get:", resGetIpns2);
@@ -795,7 +954,16 @@ export async function refreshIPNSFeed(
 
   let resIPNS;
 
-  const topAuthorDirName = `matters.town/@${author.userName}`;
+  const topAuthorDirName = `matters.town/@${author.userName}`; // ${ extraBundles.length > 0 ? `@${dateSuffix}` : "" }`;
+  {
+    // check & delete if exists
+    const res = await gw3Client.getIpnsByName(topAuthorDirName);
+    if (res?.code === 200 && res.data.name !== testGw3IPNSKey) {
+      // name/rm
+      const res2 = await gw3Client.rmIPNSName(res.data.name);
+    }
+  }
+
   if (resGetIpns1?.code === 200) {
     // existed: do update
     if (resGetIpns1?.data.value === lastCid) {
@@ -885,9 +1053,8 @@ export async function refreshIPNSFeed(
     missing: missingEntries.length,
     missingInLast50:
       missingEntries.length === 0 ? undefined : missingEntriesInLast50.length,
-    testGw3IPNSKey,
+    ...(useMattersIPNS ? null : { testGw3IPNSKey, pem: keyPair.pem }),
     ipnsKey: testGw3IPNSKey,
-    pem: keyPair.pem,
     pemName: kname,
     lastDataHash: lastCid,
     lastCidSize: lastCidData?.size,
@@ -901,6 +1068,7 @@ export async function refreshIPNSFeed(
         ? (ipnsKeyRec?.stats?.retriesAfterMissing ?? 0) + 1
         : undefined,
     useMattersIPNS: useMattersIPNS || undefined,
+    webfHost,
   };
   let ipnsKeyRecUpdated: Item = ipnsKeyRec!;
 
@@ -928,7 +1096,9 @@ export async function refreshIPNSFeed(
                 ? "missingInLast50"
                 : undefined,
             ],
-            [useMattersIPNS ? undefined : "useMattersIPNS"],
+            [useMattersIPNS ? ["testGw3IPNSKey", "pem"] : "useMattersIPNS"],
+            [webfHost == null ? "webfHost" : undefined],
+            "isPurged",
           ]
             .flat(Infinity)
             .filter(Boolean)
@@ -944,7 +1114,7 @@ export async function refreshIPNSFeed(
 
   console.log(
     new Date(),
-    `updated for author: '${author.displayName} (@${author.userName})': get ${articles.length} articles /${drafts.length} drafts`,
+    `updated for author: '${author.displayName} (@${author.userName})' at ${webfHost}: get ${articles.length} articles /${drafts.length} drafts`,
     missingEntriesInLast50.map(({ id, slug, dataHash }) => ({
       path: `${id}-${slug}`,
       dataHash,
