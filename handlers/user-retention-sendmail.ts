@@ -23,7 +23,8 @@ export const handler = async (event: SQSEvent) => {
   // print failed reseaon
   results.map((res) => {
     if (res.status === "rejected") {
-      console.error(res.reason);
+      console.error("sendmail failed, reason:");
+      console.dir(res.reason, { depth: null });
     }
   });
 
