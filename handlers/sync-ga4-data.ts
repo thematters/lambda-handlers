@@ -14,9 +14,7 @@ import {
 // AWS EventBridge can configure the input event sent to Lambda,
 // see https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-transform-target-input.html for info.
 type Event = {
-  data: {
-    type: "today" | "yesterday";
-  };
+  type: "today" | "yesterday";
 };
 
 const getDate = (type: "today" | "yesterday") => {
@@ -28,8 +26,8 @@ const getDate = (type: "today" | "yesterday") => {
 };
 
 export const handler = async (event: Event) => {
-  const { type } = event.data;
-  const startDate = getDate(type);
+  console.log("event: ", event);
+  const startDate = getDate(event.type);
   const endDate = startDate;
   const data = await fetchGA4Data({ startDate, endDate });
   const convertedData = await convertAndMerge(data);
