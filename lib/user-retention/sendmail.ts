@@ -8,7 +8,7 @@ import { markUserState, loadUserRetentionState } from "./utils.js";
 
 const siteDomain = process.env.MATTERS_SITE_DOMAIN || "";
 const newFeatureTagId = process.env.MATTERS_NEW_FEATURE_TAG_ID || "";
-const isProd = siteDomain === "https://matters.news";
+const isProd = siteDomain === "https://matters.town";
 
 const mail = new Mail();
 
@@ -27,6 +27,10 @@ export const sendmail = async (
   const { displayName, email, language, createdAt, state } = await loadUserInfo(
     userId
   );
+  if (!email) {
+    console.warn(`User ${userId} has no email, sendmail quit.`);
+    return;
+  }
   const goodState = ["onboarding", "active"];
   if (!goodState.includes(state)) {
     console.warn(`Unexpected user state: ${state},  sendmail quit.`);
