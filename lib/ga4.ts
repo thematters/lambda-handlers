@@ -101,13 +101,16 @@ export const convertAndMerge = async (rows: Row[]): Promise<MergedData> => {
     if (row.id in res) {
       res[row.id] += row.totalUsers;
     } else {
-      res[row.id] = row.totalUsers;
+      if (row.id) {
+        res[row.id] = row.totalUsers;
+      }
     }
   }
   return res;
 };
 
 const pathToId = async (path: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_, __, articlePath] = path.split("/");
   if (articlePath) {
     const parts = articlePath.split("-");
