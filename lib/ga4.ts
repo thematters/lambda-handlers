@@ -116,7 +116,7 @@ const pathToId = async (path: string) => {
     const parts = articlePath.split("-");
     const idLike = parts[0];
     const hash = parts[parts.length - 1];
-    if (!isNaN(parseInt(idLike))) {
+    if (/^-?\d+$/.test(idLike)) {
       return idLike;
     } else {
       return hashToId(hash);
