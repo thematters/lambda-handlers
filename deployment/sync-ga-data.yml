@@ -53,6 +53,12 @@ Resources:
       MemorySize: 512
       Timeout: 900
       Role: !GetAtt LambdaRole.Arn
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-0adf0602441a6725f
+        SubnetIds:
+          - subnet-0b011dd1ca64fa0a1
+          - subnet-0415147ddf68a48f2
   LambdaRole:
     Type: "AWS::IAM::Role"
     Properties:
