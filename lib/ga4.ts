@@ -97,11 +97,13 @@ export const convertAndMerge = async (rows: Row[]): Promise<MergedData> => {
     }))
   );
   const res: MergedData = {};
+  const ret = await knexRO("article").max("id").first();
+  const maxLegalId = ret ? parseInt(ret.max) : 0;
   for (const row of await converted) {
     if (row.id in res) {
       res[row.id] += row.totalUsers;
     } else {
-      if (row.id) {
+      if (row.id && parseInt(row.id) <= maxLegalId) {
         res[row.id] = row.totalUsers;
       }
     }
