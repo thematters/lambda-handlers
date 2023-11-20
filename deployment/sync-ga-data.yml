@@ -1,0 +1,145 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: lambda to sync ga article data
+
+Parameters:
+  imageUri:
+    Type: String
+    Description: "the Amazon ECR image URL of lambda-handlers to deploy"
+  mattersGA4PropertyId:
+    Type: String
+  mattersGA4ProjectId:
+    Type: String
+  mattersGA4ClientEmail:
+    Type: String
+  mattersGA4PrivateKey:
+    Type: String
+  mattersPgHost:
+    Type: String
+  mattersPgDatabase:
+    Type: String
+  mattersPgUser:
+    Type: String
+  mattersPgPassword:
+    Type: String
+  mattersPgRoConnectionString:
+    Type: String
+
+Resources:
+  Lambda:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Description: >-
+        A Lambda to sync ga articles data of matters.town.
+      Code:
+        ImageUri: !Ref imageUri
+      PackageType: Image
+      ImageConfig:
+        Command:
+          - sync-ga4-data.handler
+      Environment:
+        Variables:
+          MATTERS_GA4_PROPERTY_ID: !Ref mattersGA4PropertyId
+          MATTERS_GA4_PROJECT_ID: !Ref mattersGA4ProjectId
+          MATTERS_GA4_CLIENT_EMAIL: !Ref mattersGA4ClientEmail
+          MATTERS_GA4_PRIVATE_KEY: !Ref mattersGA4PrivateKey
+          MATTERS_PG_HOST: !Ref mattersPgHost
+          MATTERS_PG_DATABASE: !Ref mattersPgDatabase
+          MATTERS_PG_USER: !Ref mattersPgUser
+          MATTERS_PG_PASSWORD: !Ref mattersPgPassword
+          MATTERS_PG_RO_CONNECTION_STRING: !Ref mattersPgRoConnectionString
+      Architectures:
+        - x86_64
+      MemorySize: 512
+      Timeout: 900
+      Role: !GetAtt LambdaRole.Arn
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-0adf0602441a6725f
+        SubnetIds:
+          - subnet-0b011dd1ca64fa0a1
+          - subnet-0415147ddf68a48f2
+  LambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - "sts:AssumeRole"
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+  LambdaRolePolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      Roles:
+        - !Ref LambdaRole
+      PolicyName: "syncGaDataLambda"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "logs:CreateLogGroup"
+            Effect: Allow
+            Resource: !Join
+              - ""
+              - - "arn:"
+                - !Ref "AWS::Partition"
+                - ":logs:"
+                - !Ref "AWS::Region"
+                - ":"
+                - !Ref "AWS::AccountId"
+                - ":*"
+          - Action:
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Effect: Allow
+            Resource: !Join
+              - ""
+              - - "arn:"
+                - !Ref "AWS::Partition"
+                - ":logs:"
+                - !Ref "AWS::Region"
+                - ":"
+                - !Ref "AWS::AccountId"
+                - ":log-group:/aws/lambda/"
+                - !Ref Lambda
+                - ":*"
+  CronEvent1:
+    Type: "AWS::Events::Rule"
+    Properties:
+      ScheduleExpression: "rate(5 minutes)"
+      Targets:
+        - Arn: !GetAtt Lambda.Arn
+          Id: CronEvent1LambdaTarget
+          Input: |
+            {
+              "type": "today"
+            }
+  CronEvent1Permission:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref Lambda
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CronEvent1.Arn
+  CronEvent2:
+    Type: "AWS::Events::Rule"
+    Properties:
+      ScheduleExpression: "cron(0 20 * * ? *)"
+      Targets:
+        - Arn: !GetAtt Lambda.Arn
+          Id: CronEvent2LambdaTarget
+          Input: |
+            {
+              "type": "yesterday"
+            }
+  CronEvent2Permission:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref Lambda
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CronEvent2.Arn

@@ -50,7 +50,6 @@ jobs:
           MATTERS_PG_PASSWORD: postgres
           MATTERS_PG_DATABASE: matters-test
           MATTERS_NEW_FEATURE_TAG_ID: 1
-          MATTERS_PG_RO_CONNECTION_STRING: postgresql://postgres:postgres@localhost/test_matters-test
+          MATTERS_PG_RO_CONNECTION_STRING: postgresql://postgres:postgres@localhost/matters-test
           MATTERS_CACHE_HOST: localhost
-
-
+          MATTERS_TEST_DB_SETUP: 1

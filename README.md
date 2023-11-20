@@ -13,6 +13,7 @@ feat(lambda): multiple lambda handlers in one repo
 - [x] user-retention
 - [x] likecoin
 - [x] cloudflare-image-stats-alert (not using docker, copy the source code to lambda to deploy)
+- [x] sync-ga4-data
 
 ## Dependencies
 
@@ -59,6 +60,8 @@ and push it with `docker image push {above-full-image}:v{date-tag}`, test it wit
    - or for cron job, use EventBridge can generate events at given cron rules;
 
 Can test trigger from the AWS Lambda Console
+
+You can also deploy lambdas and related AWS resources by Cloudformation, see deployment/ folder.
 
 ### Add manual auto deploy in Github Action:
 
