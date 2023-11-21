@@ -128,7 +128,7 @@ Resources:
   CronEvent2:
     Type: "AWS::Events::Rule"
     Properties:
-      ScheduleExpression: "cron(0 20 * * ? *)"
+      ScheduleExpression: "rate(30 minutes)"
       Targets:
         - Arn: !GetAtt Lambda.Arn
           Id: CronEvent2LambdaTarget
@@ -143,3 +143,39 @@ Resources:
       FunctionName: !Ref Lambda
       Principal: events.amazonaws.com
       SourceArn: !GetAtt CronEvent2.Arn
+  CronEvent3:
+    Type: "AWS::Events::Rule"
+    Properties:
+      ScheduleExpression: "rate(1 hour)"
+      Targets:
+        - Arn: !GetAtt Lambda.Arn
+          Id: CronEvent2LambdaTarget
+          Input: |
+            {
+              "type": "2 days ago"
+            }
+  CronEvent3Permission:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref Lambda
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CronEvent3.Arn
+  CronEvent4:
+    Type: "AWS::Events::Rule"
+    Properties:
+      ScheduleExpression: "rate(1 hour)"
+      Targets:
+        - Arn: !GetAtt Lambda.Arn
+          Id: CronEvent2LambdaTarget
+          Input: |
+            {
+              "type": "3 days ago"
+            }
+  CronEvent4Permission:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref Lambda
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CronEvent4.Arn
