@@ -127,12 +127,12 @@ const pathToId = async (path: string) => {
 };
 
 const hashToId = async (hash: string) => {
-  const res = await knexRO("article")
+  const res = await knexRO("draft")
     .where({ mediaHash: hash })
-    .select("id")
+    .select("article_id")
     .first();
   if (res) {
-    return res.id;
+    return res.articleId;
   } else {
     return null;
   }
