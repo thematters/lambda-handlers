@@ -149,7 +149,7 @@ Resources:
       ScheduleExpression: "rate(1 hour)"
       Targets:
         - Arn: !GetAtt Lambda.Arn
-          Id: CronEvent2LambdaTarget
+          Id: CronEvent3LambdaTarget
           Input: |
             {
               "type": "2 days ago"
@@ -167,7 +167,7 @@ Resources:
       ScheduleExpression: "rate(1 hour)"
       Targets:
         - Arn: !GetAtt Lambda.Arn
-          Id: CronEvent2LambdaTarget
+          Id: CronEvent4LambdaTarget
           Input: |
             {
               "type": "3 days ago"
