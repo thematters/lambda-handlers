@@ -306,8 +306,8 @@ const getTemplateId = (language: Language): string => {
     en: "d-b5f06dcfc0984953b0b8f6fbf38d7b25",
   };
   const templateIdsProd = {
-    zh_hant: "d-ead2168972df477ca329d3c1e9ba2ca8", // TO Change
-    zh_hans: "d-78b94f4b29d7437ba2db8802f2aac587",
+    zh_hant: "d-4d4b3b0535a444e983631fdac6e4316c",
+    zh_hans: "d-3a7aa2ff240e4a7e8275b371a3aabf51",
     en: "d-b5f06dcfc0984953b0b8f6fbf38d7b25",
   };
   const templateIds = isProd ? templateIdsProd : templateIdsDev;
@@ -534,27 +534,34 @@ async function sendNomadBadgeMail(
         shareLink,
       });
 
-      return mail.send({
-        from: EMAIL_FROM_ASK,
-        templateId: getTemplateId(language),
-        personalizations: [
-          {
-            to: email,
-            dynamicTemplateData: {
-              subject: getSubject(language, newLevel),
-              displayName,
-              siteDomain,
-              shareLink,
-              newLevel,
-              campaignLink: isProd
-                ? `${siteDomain}/@hi176/464035-nomad-matters`
-                : `${siteDomain}/@rsdyobw/22048-launching-the-nomad-matters-initiative`,
-              // campaignLink: "${siteDomain}/@rsdyobw/22048-launching-the-nomad-matters-initiative?utm_source=share_copy&referral=nrux",
-              // recipient, type,
+      if (!email) {
+        return; // can't send if no email
+      }
+
+      return mail
+        .send({
+          from: EMAIL_FROM_ASK,
+          templateId: getTemplateId(language),
+          personalizations: [
+            {
+              to: email,
+              dynamicTemplateData: {
+                subject: getSubject(language, newLevel),
+                displayName,
+                siteDomain,
+                shareLink,
+                newLevel,
+                campaignLink: isProd
+                  ? `${siteDomain}/@hi176/464035-nomad-matters`
+                  : `${siteDomain}/@rsdyobw/22048-launching-the-nomad-matters-initiative`,
+                // campaignLink: "${siteDomain}/@rsdyobw/22048-launching-the-nomad-matters-initiative?utm_source=share_copy&referral=nrux",
+                // recipient, type,
+              },
             },
-          },
-        ],
-      });
+          ],
+        })
+        .then((res: any) => console.log(`mail "${email}" res:`, res))
+        .catch((err: Error) => console.error(`mail "${email}" ERROR:`, err));
     })
   );
 }
