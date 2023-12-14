@@ -16,7 +16,7 @@ const mail = new Mail();
 const MATTERS_CAMPAIGN_TAGS_IDS = JSON.parse(
   process.env.MATTERS_CAMPAIGN_TAGS_IDS || "[157201]"
 ); // https://matters.town/tags/157201-nomadmatters?type=latest
-const MATTERS_CAMPAIGN_BEGINS =
+const MATTERS_CAMPAIGN_BEGINS 
   process.env.MATTERS_CAMPAIGN_BEGINS || "2023-12-14T16:00:00.000Z"; // 2023-12-15T00:00 in UTC+8
 const MATTERS_CAMPAIGN_ENDS =
   process.env.MATTERS_CAMPAIGN_ENDS || "2024-01-14T15:59:59.999Z"; // 2024-01-15T23:59 in UTC+8
@@ -459,7 +459,7 @@ async function notifyNomadBadge(
         newLevel <= 3 // only Lv1, Lv2, Lv3 need link on message
           ? JSON.stringify({
               link: isProd
-                ? "/@hi176/464035-nomad-matters"
+                ? "/@hi176/476404"
                 : "/@rsdyobw/22048-launching-the-nomad-matters-initiative",
             })
           : null
@@ -552,7 +552,7 @@ async function sendNomadBadgeMail(
                 shareLink,
                 newLevel,
                 campaignLink: isProd
-                  ? `${siteDomain}/@hi176/464035-nomad-matters`
+                  ? `${siteDomain}/@hi176/476404`
                   : `${siteDomain}/@rsdyobw/22048-launching-the-nomad-matters-initiative`,
                 // campaignLink: "${siteDomain}/@rsdyobw/22048-launching-the-nomad-matters-initiative?utm_source=share_copy&referral=nrux",
                 // recipient, type,
