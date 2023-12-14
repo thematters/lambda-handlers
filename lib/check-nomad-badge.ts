@@ -459,7 +459,7 @@ async function notifyNomadBadge(
         newLevel <= 3 // only Lv1, Lv2, Lv3 need link on message
           ? JSON.stringify({
               link: isProd
-                ? "/@hi176/464035-nomad-matters"
+                ? "/@hi176/476404"
                 : "/@rsdyobw/22048-launching-the-nomad-matters-initiative",
             })
           : null
@@ -552,7 +552,7 @@ async function sendNomadBadgeMail(
                 shareLink,
                 newLevel,
                 campaignLink: isProd
-                  ? `${siteDomain}/@hi176/464035-nomad-matters`
+                  ? `${siteDomain}/@hi176/476404`
                   : `${siteDomain}/@rsdyobw/22048-launching-the-nomad-matters-initiative`,
                 // campaignLink: "${siteDomain}/@rsdyobw/22048-launching-the-nomad-matters-initiative?utm_source=share_copy&referral=nrux",
                 // recipient, type,
