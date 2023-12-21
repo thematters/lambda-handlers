@@ -36,18 +36,19 @@ export const handler = async (
     campaignTagIds,
     campaignBegins,
     campaignEnds,
+    dryRun: false,
   });
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ message: "done.", newBadges }),
-    ...(origin &&
-    ["https://matters-tech.static.observableusercontent.com"].includes(origin)
-      ? {
-          headers: {
-            "Access-Control-Allow-Origin": origin,
-          },
-        }
-      : null),
+    body: JSON.stringify({
+      message: `done${
+        newBadges?.length > 0
+          ? `, processed ${newBadges.length} new or upgraded nomad badges`
+          : ", with nothing to do..."
+      }.`,
+      newBadges,
+    }),
+    // ...(origin && ["https://matters-tech.static.observableusercontent.com"].includes(origin) ? { headers: { "Access-Control-Allow-Origin": origin, }, } : null),
   };
 };

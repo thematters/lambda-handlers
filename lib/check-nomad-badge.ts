@@ -73,7 +73,7 @@ WITH all_applicant_articles AS (
   WHERE article.state IN ('active')
     AND article.created_at BETWEEN ${campaignBegins!} AND ${campaignEnds!}
     AND tag_id =ANY(${campaignTagIds})
-  ORDER BY author_id, article.created_at DESC
+  ORDER BY author_id, article.created_at ASC
 ), all_apprs_to_applicants AS (
   SELECT DISTINCT ON (sender_id) sender_id ::int, created_at
   FROM appreciation
@@ -81,14 +81,15 @@ WITH all_applicant_articles AS (
     AND purpose IN ('appreciate')
     AND created_at BETWEEN ${campaignBegins!} AND ${campaignEnds!}
   ORDER BY sender_id, -- updated_at DESC,
-    created_at DESC
+    created_at ASC
 ), all_donations_to_applicants AS (
   SELECT DISTINCT ON (sender_id) sender_id ::int, created_at
   FROM transaction
   WHERE purpose='donation' AND state='succeeded'
     AND target_type=4 AND target_id IN ( SELECT id FROM all_applicant_articles )
     AND created_at BETWEEN ${campaignBegins!} AND ${campaignEnds!}
-  ORDER BY sender_id, updated_at DESC, created_at DESC
+  ORDER BY sender_id, -- updated_at DESC,
+    created_at ASC
 ), merged_all AS (
   SELECT DISTINCT ON (user_id) user_id, last_act, last_act_at
   FROM (
@@ -98,7 +99,7 @@ WITH all_applicant_articles AS (
     UNION ALL
     SELECT sender_id ::int AS user_id, 'donate_to_applicant' AS last_act, created_at AS last_act_at FROM all_donations_to_applicants
   ) t
-  ORDER BY user_id, last_act_at DESC
+  ORDER BY user_id, last_act_at ASC
 ), all_referrals AS (
   SELECT t.*
   FROM (
@@ -129,9 +130,12 @@ WHERE u.state IN ('active') -- NOT IN ('archived', 'banned', 'frozen')
   AND ( ub.extra IS NULL -- newly gaining nomad1
     OR COALESCE((u.extra->'referredCount')::int, -1) < all_referrals."referredCount" -- find out only those having new referrals
   )
-ORDER BY aa.last_act_at DESC ; `;
+ORDER BY aa.last_act_at ASC ; `;
 
-  console.log("consider all participants:", allParticipants);
+  console.log(
+    `consider all new (${allParticipants?.length ?? 0}) participants:`,
+    allParticipants
+  );
   if (allParticipants.length === 0) {
     console.log(`no new participants found; nothing to do...`);
     return;
@@ -142,12 +146,14 @@ ORDER BY aa.last_act_at DESC ; `;
     // && shouldGetNewLevel(userName, 1)
   ); // for all ones got Lv1
 
-  console.log("consider new nomad1 badges:", newNomad1BadgedUsers);
-  // await putBadges(newNomad1BadgedUsers, true);
+  console.log(
+    `consider new nomad1 (${newNomad1BadgedUsers.length}) badged users:`,
+    newNomad1BadgedUsers
+  );
   if (newNomad1BadgedUsers.length > 0) {
     // send badges, send mattersDB notification, send emails
-    await notifyNomadBadge(newNomad1BadgedUsers, 1, true);
-    await sendNomadBadgeMail(newNomad1BadgedUsers, 1, true);
+    await notifyNomadBadge(newNomad1BadgedUsers, 1, !dryRun);
+    await sendNomadBadgeMail(newNomad1BadgedUsers, 1, !dryRun);
   }
 
   const newNomad2BadgedUsers = allParticipants.filter(
@@ -156,12 +162,15 @@ ORDER BY aa.last_act_at DESC ; `;
       getNewLevel(referral?.referredCount || 0) >= 2
   ); // for all ones got Lv2
 
-  console.log("consider new nomad2 badges:", newNomad2BadgedUsers);
+  console.log(
+    `consider new nomad2 (${newNomad2BadgedUsers.length}) badged users:`,
+    newNomad2BadgedUsers
+  );
   if (newNomad2BadgedUsers.length > 0) {
     // send badges, send mattersDB notification, send emails
     await delay(1300); // give it a few seconds for all prior level mails sent
-    await notifyNomadBadge(newNomad2BadgedUsers, 2, true);
-    await sendNomadBadgeMail(newNomad2BadgedUsers, 2 as const, true);
+    await notifyNomadBadge(newNomad2BadgedUsers, 2, !dryRun);
+    await sendNomadBadgeMail(newNomad2BadgedUsers, 2 as const, !dryRun);
   }
 
   const newNomad3BadgedUsers = allParticipants.filter(
@@ -171,12 +180,15 @@ ORDER BY aa.last_act_at DESC ; `;
       getNewLevel(referral?.referredCount || 0) >= 3
   ); // for all ones got Lv3
 
-  console.log("consider new nomad3 badges:", newNomad3BadgedUsers);
+  console.log(
+    `consider new nomad3 (${newNomad3BadgedUsers.length}) badged users:`,
+    newNomad3BadgedUsers
+  );
   if (newNomad3BadgedUsers.length > 0) {
     // send badges, send mattersDB notification, send emails
     await delay(1300); // give it a few seconds for all prior level mails sent
-    await notifyNomadBadge(newNomad3BadgedUsers, 3, true);
-    await sendNomadBadgeMail(newNomad3BadgedUsers, 3 as const, true);
+    await notifyNomadBadge(newNomad3BadgedUsers, 3, !dryRun);
+    await sendNomadBadgeMail(newNomad3BadgedUsers, 3 as const, !dryRun);
   }
 
   const newNomad4BadgedUsers = allParticipants.filter(
@@ -186,12 +198,15 @@ ORDER BY aa.last_act_at DESC ; `;
       getNewLevel(referral?.referredCount || 0) >= 4
   ); // for all ones got Lv4
 
-  console.log("consider new nomad4 badged users:", newNomad4BadgedUsers);
+  console.log(
+    `consider new nomad4 (${newNomad4BadgedUsers.length}) badged users:`,
+    newNomad4BadgedUsers
+  );
   if (newNomad4BadgedUsers.length > 0) {
     // send badges, send mattersDB notification, send emails
     await delay(1300); // give it a few seconds for all prior level mails sent
-    await notifyNomadBadge(newNomad4BadgedUsers, 4, true);
-    await sendNomadBadgeMail(newNomad4BadgedUsers, 4 as const, true);
+    await notifyNomadBadge(newNomad4BadgedUsers, 4, !dryRun);
+    await sendNomadBadgeMail(newNomad4BadgedUsers, 4 as const, !dryRun);
   }
 
   // update each user's referredCount
@@ -200,7 +215,7 @@ ORDER BY aa.last_act_at DESC ; `;
       currentReferredCount < (referral?.referredCount || 0)
   );
   if (referrals.length > 0) {
-    await updateReferredCount(referrals, true);
+    await updateReferredCount(referrals, !dryRun);
   }
 
   const allNewBadges = allParticipants
@@ -213,7 +228,7 @@ ORDER BY aa.last_act_at DESC ; `;
     .filter(({ currentLevel, newLevel }) => currentLevel < newLevel);
 
   if (allNewBadges.length > 0) {
-    return putBadges(allNewBadges, true);
+    return putBadges(allNewBadges, !dryRun);
   }
 }
 
@@ -436,7 +451,7 @@ async function notifyNomadBadge(
   );
   const messageIds = await sql<
     Array<{ id: number | string; noticeType: string; message: string }>
-  >`SELECT * FROM notice_detail WHERE created_at>='2023-12-01' AND notice_type='official_announcement' AND message=ANY(${allMessages}) ;`;
+  >`SELECT * FROM notice_detail WHERE created_at>=CURRENT_DATE -'1 week'::interval AND notice_type='official_announcement' AND message=ANY(${allMessages}) ;`;
   const messageIdsMap = new Map(
     messageIds.map(({ id, message }) => [message, id])
   );
