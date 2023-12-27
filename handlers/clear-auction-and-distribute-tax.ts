@@ -10,6 +10,8 @@ import {
 } from '../lib/billboard/index.js'
 import { SLACK_MESSAGE_STATE, Slack } from '../lib/utils/slack.js'
 
+const notifySlack = process.env.DO_NOTIFY_SLACK === 'true'
+
 type Step = 'clearAuctions' | 'withdrawTax' | 'drop'
 
 type RequestBody = {
@@ -35,6 +37,13 @@ export const handler = async (
   const merkleRoot = body.merkleRoot as `0x${string}`
   const treeId = merkleRoot
   const fromStep: Step = body.fromStep || 'clearAuctions'
+  console.log(new Date(), `from input:`, {
+    fromTokenId,
+    toTokenId,
+    merkleRoot,
+    treeId,
+    fromStep,
+  })
 
   if (body.accessToken !== process.env.ACCESS_TOKEN) {
     return {
@@ -80,6 +89,7 @@ export const handler = async (
         args: [auctions.map(({ tokenId }) => tokenId)],
       })
       await walletClient.writeContract(clearAuctionsResult.request)
+      await delay((2 + Math.random() * 10) * 1e3) // wait the nonce to be set correctly for next call
     }
 
     // Step 2: withdraw tax
@@ -91,6 +101,7 @@ export const handler = async (
       })
       await walletClient.writeContract(withdrawTaxResult.request)
       tax = withdrawTaxResult.result
+      await delay((2 + Math.random() * 10) * 1e3) // wait the nonce to be set correctly for next call
     }
 
     // Step 3: create new drop with merkle root and tax
@@ -133,11 +144,15 @@ export const handler = async (
       message: error.message,
       cause: error.cause,
     }
-    await slack.sendStripeAlert({ data, message: error.name })
+    notifySlack && (await slack.sendStripeAlert({ data, message: error.name })) // too long error stack is not showing well on Slack, better to read in CloudWatch logs...
 
     return {
       statusCode: 500,
       body: JSON.stringify({ data, message: error.name }),
     }
   }
+}
+
+function delay(ms: number) {
+  return new Promise((fulfilled) => setTimeout(fulfilled, ms))
 }

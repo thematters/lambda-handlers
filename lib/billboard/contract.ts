@@ -47,7 +47,7 @@ export const getClearableAuctions = async ({
     auctionIdsResults
       .filter(({ result }) => !!result && BigInt(result) > 0)
       .map(({ result }, i) => ({
-        tokenId: BigInt(i + 1),
+        tokenId: BigInt(i) + fromTokenId,
         auctionId: BigInt(result!),
       }))
 
@@ -72,21 +72,32 @@ export const getClearableAuctions = async ({
       auctionId: auctionIds[i].auctionId,
       result,
     }))
-    .filter(({ result }) => {
-      if (!result) {
+    .filter(({ result, ...rest }) => {
+      if (!result?.startAt) {
+        console.log(new Date(), `filter-out of no result:`, result)
+        return false
+      }
+      if (!result.startAt) {
+        console.log(new Date(), `filter-out of no startAt:`, result)
         return false
       }
 
       // already ended
       if (result.endAt > blockNow) {
+        console.log(new Date(), `filter-out blockNow not pass yet:`, {
+          result,
+          blockNow,
+        })
         return false
       }
 
       // already cleared
       if (result.leaseEndAt) {
+        console.log(new Date(), `filter-out leaseEnded:`, { result })
         return false
       }
 
+      console.log(new Date(), `keep this auction:`, { result, ...rest })
       return true
     })
     .map(({ tokenId, auctionId }) => ({ tokenId, auctionId }))
