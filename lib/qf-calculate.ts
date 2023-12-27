@@ -345,6 +345,12 @@ WHERE purpose='donation' AND state='succeeded'
       sum_u$: +(Number(statsAmount.sum) / 1e6).toFixed(6),
       avg_u$: +(Number(statsAmount.sum) / 1e6 / stats.amount.length).toFixed(6),
     },
+    fromTime,
+    toTime,
+    fromBlock,
+    toBlock,
+    minBlockNumber,
+    maxBlockNumber,
   }
   console.log('stats:', stats, statsSummary, {
     numIPFSCids: ipfsArticleHashes.length,
@@ -571,10 +577,10 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
         trustPoints: 0.0,
         countDonations: v.number_contributions,
         sumDonations: v.sum,
-        hasAvatar: senderObj?.hasAvatar,
-        hasDescription: senderObj?.hasDescription,
-        hasGoogleAccount: !!senderObj?.sag?.email, // check is valid
-        hasTwitterAccount: !!senderObj?.sat?.userName, // check twitter history length;
+        hasAvatar: senderObj?.hasAvatar || undefined,
+        hasDescription: senderObj?.hasDescription || undefined,
+        hasGoogleAccount: !!senderObj?.sag?.email || undefined, // check is valid
+        hasTwitterAccount: !!senderObj?.sat?.userName || undefined, // check twitter history length;
         numBadges: senderObj?.numBadges,
         numArticles: senderObj?.numArticles,
         numArticlesFeatured: senderObj?.numArticlesFeatured,
@@ -613,8 +619,23 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
     })
   }
 
+  const seqsQualified = seqs.filter(
+    // filter out non-ipfs url
+    // filter out if the sender has too low trust points;
+    // filter out if the recipient address no longer has a matters account;
+    ({ from, to, dataHash }) =>
+      dataHash &&
+      dataHashMappings.has(dataHash) &&
+      (!isProd || // no threshold on web-develop
+        sendersOut.get(from.toLowerCase()).trustPoints > 0) // threshold on Prod is 0 for now, will need to change later
+  )
+  console.log(new Date(), `sendersOut:`, sendersOut, {
+    fromTransactions: seqs.length,
+    qualifiedTransactions: seqsQualified.length,
+  })
+
   const aggPerProj = d3.rollup(
-    seqs,
+    seqsQualified,
     (g) => ({
       amounts: g.map((d) => d.amount).sort(ascending),
       to: Array.from(new Set(g.map((d) => d.to))),
@@ -627,29 +648,18 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
       // .sort( d3.ascending // (a, b) => a == null || b == null ? NaN : a < b ? -1 : a > b ? 1 : a >= b ? 0 : NaN , // https://github.com/d3/d3-array/blob/main/src/ascending.js
       sum: g.reduce((acc, b) => acc + b.amount, 0n),
     }),
-    (d) =>
-      (dataHashMappings.get(d.dataHash)?.[0]?.dataHash ?? d.dataHash) || d.uri // d.dataHash || d.uri
+    (d) => dataHashMappings.get(d.dataHash)?.[0]?.latestDataHash ?? d.dataHash // || d.uri // d.dataHash || d.uri
   )
   console.log('for seqs contrib:', aggPerProj)
 
   const aggPerProjFrom = d3.rollup(
-    seqs.filter(
-      // filter out non-ipfs url
-      // filter out if the sender has too low trust points;
-      // filter out if the recipient address no longer has a matters account;
-      ({ from, to, dataHash }) =>
-        dataHash &&
-        dataHashMappings.has(dataHash) &&
-        (!isProd || // no threshold on web-develop
-          sendersOut.get(from.toLowerCase()).trustPoints > 0) // threshold on Prod is 0 for now, will need to change later
-    ),
+    seqsQualified,
     (g) => ({
       amounts: g.map((d) => d.amount),
       sum: g.reduce((acc, b) => acc + b.amount, 0n), // d3.sum(g, (d) => d.amount),
     }),
-    (d) =>
-      // dataHashMappings.has(d.dataHash)
-      (dataHashMappings.get(d.dataHash)?.[0]?.dataHash ?? d.dataHash) || d.uri,
+    (d) => dataHashMappings.get(d.dataHash)?.[0]?.latestDataHash ?? d.dataHash, // || d.uri // d.dataHash || d.uri
+    // (d) => // dataHashMappings.has(d.dataHash) // (dataHashMappings.get(d.dataHash)?.[0]?.dataHash ?? d.dataHash) || d.uri,
     (d) => d.from
   )
 
@@ -694,6 +704,7 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
         id: proj,
         title: dataHashAttributes?.[0]?.title,
         number_contributions: aggPerProj.get(proj)?.number_contributions,
+        number_contributions_merged: aggPerProjFrom.get(proj)?.size,
         number_contribution_addresses:
           aggPerProj.get(proj)?.number_contribution_addresses,
         contribution_amount: aggPerProj.get(proj)?.sum,
@@ -713,6 +724,10 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
         // created_at,
         // author_eth, // tot, _q_summed,
         amounts: aggPerProj.get(proj)?.amounts,
+        amountsMerged: Array.from(
+          aggPerProjFrom.get(proj)!.values(),
+          (d) => d.sum
+        ), // .flat(Infinity),
       })
 
       // [ id, address, amount ],
@@ -779,40 +794,6 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
 
   // (3)
   console.log(`Merkle Root with ${treeValues.length} entries:`, tree.root)
-
-  gist.files['README.md'].content = `${runningBetween},
-
-\`\`\`js
-// from Optimism onChain:
-${util.inspect(
-  statsSummary, // replacer
-  { compact: false }
-  // (_, v) => (typeof v === 'bigint' ? +Number(v) : v),
-  // 2
-)}
-
-// from MattersDB:
-${util.inspect(
-  {
-    numIPFSCids: ipfsArticleHashes.length,
-    ...usdtDonationsStats,
-  },
-  { compact: false }
-)}
-
-// for Distribute
-${util.inspect(
-  {
-    amountTotal, // : util.format('%i', amountTotal),
-    sharesTotal,
-  },
-  { compact: false }
-)}
-\`\`\`
-
-Merkle Tree Root (with ${treeValues.length} entries): \`${tree.root}\`
-
-this is analyzing results with [Quadratic Funding score calcuation with Pairwise Mechanism](https://github.com/gitcoinco/quadratic-funding?tab=readme-ov-file#implementation-upgrade-the-pairwise-mechanism)`
 
   // (4) // write out to somewhere S3 bucket?
   // fs.writeFileSync("out/tree.json", JSON.stringify(tree.dump(), null, 2));
@@ -892,6 +873,41 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
         .join(',\n') +
       ' ]',
   }
+
+  gist.files['README.md'].content = `${runningBetween},
+
+\`\`\`js
+// from Optimism onChain:
+${util.inspect(
+  Object.assign(
+    statsSummary, // replacer
+    {
+      // for Distribute
+      cidsCount: new Set(Array.from(treeValues, (d) => d[0])).size,
+      authorsCount: new Set(Array.from(treeValues, (d) => d[1])).size,
+      amountTotal,
+      sharesTotal: d3.sum(Array.from(treeValues, (d) => d[2])),
+    }
+  ),
+  { compact: false }
+  // (_, v) => (typeof v === 'bigint' ? +Number(v) : v),
+  // 2
+)}
+
+// from MattersDB:
+${util.inspect(
+  Object.assign(usdtDonationsStats, {
+    numIPFSCids: dataHashMappings.size, // ipfsArticleHashes.length,
+    numIPFSCidsMerged: dataHashRevisdedMappings.size,
+    // ...usdtDonationsStats,
+  }),
+  { compact: false }
+)}
+\`\`\`
+
+Merkle Tree Root (with ${treeValues.length} entries): \`${tree.root}\`
+
+this is analyzing results with [Quadratic Funding score calcuation with Pairwise Mechanism](https://github.com/gitcoinco/quadratic-funding?tab=readme-ov-file#implementation-upgrade-the-pairwise-mechanism)`
 
   let gist_url: string | undefined = undefined
   if (write_gist && GITHUB_TOKEN) {

@@ -29,7 +29,7 @@ async function main() {
     args?.[1] || 117_741_511n // the Round1 launch time "2024年3月22日 星期五 中午12:30 [台北標準時間]"
   )
   const toBlock = BigInt(
-    args?.[2] || 1_118_000_000n // a big block number in long future
+    args?.[2] || 9_999_000_000n // a big block number in long future
   )
 
   const res = await calculateQFScore({
