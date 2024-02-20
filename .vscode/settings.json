@@ -1,0 +1,13 @@
+{
+    "editor.formatOnSave": true,
+    "editor.wordWrap": "on",
+    "prettier.requireConfig": true,
+    "javascript.updateImportsOnFileMove.enabled": "never",
+    "typescript.updateImportsOnFileMove.enabled": "never",
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    },
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true
+  }
+  
