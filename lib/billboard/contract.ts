@@ -1,4 +1,4 @@
-import { billboardAbi, billboardRegistryAbi } from './abi'
+import { billboardAbi, billboardRegistryAbi, distributionAbi } from './abi'
 import { publicClient, account } from './client'
 
 // number of auctions to be cleared at once
@@ -13,6 +13,12 @@ export const billboardContract = {
 export const billboardRegsitryContract = {
   address: process.env.BILLBOARD_REGISTRY_CONTRACT_ADDRESS as `0x${string}`,
   abi: billboardRegistryAbi,
+} as const
+
+export const distributionContract = {
+  address: process.env.DISTRIBUTION_CONTRACT_ADDRESS as `0x${string}`,
+  abi: distributionAbi,
+  account,
 } as const
 
 type Auction = { tokenId: bigint; auctionId: bigint }

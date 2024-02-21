@@ -2,7 +2,9 @@ import { Context, APIGatewayProxyResult, APIGatewayEvent } from 'aws-lambda'
 import {
   billboardContract,
   getClearableAuctions,
+  distributionContract,
   publicClient,
+  walletClient,
 } from '../lib/billboard'
 import { SimulateContractErrorType } from 'viem'
 
@@ -26,7 +28,8 @@ export const handler = async (
   const fromBlock = BigInt(event.fromBlock) || BigInt(0)
   const toBlock = BigInt(event.toBlock) || BigInt(0)
   const amount = BigInt(event.amount) || BigInt(0)
-  const merkleRoot = event.merkleRoot
+  const merkleRoot = event.merkleRoot as `0x${string}`
+  const treeId = `${fromBlock}-${toBlock}`
 
   const isInvalidTokenIds =
     fromTokenId <= 0 || toTokenId <= 0 || fromTokenId >= toTokenId
@@ -54,60 +57,54 @@ export const handler = async (
     }
   }
 
-  // Step 1: Get total tax of next auction
-  let clearAuctionRequest: any
-  let totalTax: bigint
   try {
-    const result = await publicClient.simulateContract({
+    // Step 1: clear auctions
+    const clearAuctionsResult = await publicClient.simulateContract({
       ...billboardContract,
       functionName: 'clearAuctions',
       args: [auctions.map(({ tokenId }) => tokenId)],
     })
-    clearAuctionRequest = result.request
-    totalTax = result.result[1].reduce((acc, cur) => acc + cur, BigInt(0))
+    await walletClient.writeContract(clearAuctionsResult.request)
+
+    // Step 2: withdraw tax
+    const withdrawTaxResult = await publicClient.simulateContract({
+      ...billboardContract,
+      functionName: 'withdrawTax',
+    })
+    await walletClient.writeContract(withdrawTaxResult.request)
+    const tax = withdrawTaxResult.result
+
+    // Step 3: create new drop with merkle root and tax
+    const dropResult = await publicClient.simulateContract({
+      ...distributionContract,
+      functionName: 'drop',
+      args: [treeId, merkleRoot, tax],
+    })
+    await walletClient.writeContract(dropResult.request)
+
+    // response
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        message: 'done.',
+        data: {
+          auctionIds: auctions.map((a) => a.auctionId.toString()),
+          totalTax: tax.toString(),
+          merkleRoot,
+        },
+      }),
+    }
   } catch (err) {
     const error = err as SimulateContractErrorType
     console.error(error.name, err)
 
-    // if (err instanceof BaseError) {
-    //   const revertError = err.walk(
-    //     (err) => err instanceof ContractFunctionRevertedError,
-    //   );
-    //   if (revertError instanceof ContractFunctionRevertedError) {
-    //     const errorName = revertError.data?.errorName ?? "";
-    //     console.error(errorName, err);
-    //   }
-    // }
+    // TODO: error handling
+
     return {
       statusCode: 500,
       body: JSON.stringify({
         message: error.name,
       }),
     }
-  }
-
-  // Step 2: Multicall to
-  //   1. clear auction
-  //   2. withdraw tax
-  //   2. create new drop with merkle root and tax
-  await publicClient.multicall({
-    contracts: [
-      clearAuctionRequest,
-      // 2
-      // 3
-    ],
-  })
-  // await walletClient.writeContract(request);
-
-  return {
-    statusCode: 500,
-    body: JSON.stringify({
-      message: 'done.',
-      data: {
-        auctionIds: auctions.map((a) => a.auctionId.toString()),
-        totalTax: totalTax.toString(),
-        merkleRoot,
-      },
-    }),
   }
 }
