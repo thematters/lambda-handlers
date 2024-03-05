@@ -1,4 +1,4 @@
-import { SimulateContractErrorType } from 'viem'
+import { SimulateContractErrorType, formatUnits } from 'viem'
 import { Context, APIGatewayProxyResult, APIGatewayEvent } from 'aws-lambda'
 
 import {
@@ -105,19 +105,6 @@ export const handler = async (
       args: [treeId, merkleRoot, tax],
     })
     await walletClient.writeContract(dropResult.request)
-
-    // response
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        message: 'done.',
-        data: {
-          auctionIds: auctions.map((a) => a.auctionId.toString()),
-          totalTax: tax.toString(),
-          merkleRoot,
-        },
-      }),
-    }
   } catch (err) {
     const error = err as SimulateContractErrorType
     console.error(error.name, err)
@@ -131,5 +118,23 @@ export const handler = async (
       statusCode: 500,
       body: JSON.stringify({ message: error.name }),
     }
+  }
+
+  // response
+  const data = {
+    auctionIds: auctions.map((a) => a.auctionId.toString()),
+    totalTax: tax.toString(),
+    merkleRoot,
+  }
+  slack.sendStripeAlert({
+    data,
+    message: `Drop ${treeId} with USDT ${formatUnits(tax, 6)}.`,
+  })
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      message: 'done.',
+      data,
+    }),
   }
 }
