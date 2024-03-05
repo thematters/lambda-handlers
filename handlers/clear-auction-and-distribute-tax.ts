@@ -37,19 +37,19 @@ export const handler = async (
   const fromStep = body.fromStep || 'clearAuctions'
   let tax = BigInt(body.tax || 0)
 
-  const isInvalidTokenIds =
-    fromTokenId <= 0 || toTokenId <= 0 || fromTokenId >= toTokenId
-  if (isInvalidTokenIds) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: 'invalid params' }),
-    }
-  }
-
   // Step 1: clear auctions
   let clearedAuctions: string[] = []
   if (fromStep === 'clearAuctions') {
     try {
+      const isInvalidTokenIds =
+        fromTokenId <= 0 || toTokenId <= 0 || fromTokenId >= toTokenId
+      if (isInvalidTokenIds) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: 'invalid params' }),
+        }
+      }
+
       // get auctions to be cleared
       const auctions = await getClearableAuctions({ fromTokenId, toTokenId })
 
