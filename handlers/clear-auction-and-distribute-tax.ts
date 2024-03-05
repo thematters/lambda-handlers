@@ -1,12 +1,13 @@
+import { SimulateContractErrorType } from 'viem'
 import { Context, APIGatewayProxyResult, APIGatewayEvent } from 'aws-lambda'
+
 import {
   billboardContract,
   getClearableAuctions,
   distributionContract,
   publicClient,
   walletClient,
-} from '../lib/billboard'
-import { SimulateContractErrorType } from 'viem'
+} from '../lib/billboard/index.js'
 import { Slack } from '../lib/utils/slack.js'
 
 export const handler = async (

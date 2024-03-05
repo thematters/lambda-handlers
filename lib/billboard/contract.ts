@@ -1,5 +1,5 @@
-import { billboardAbi, billboardRegistryAbi, distributionAbi } from './abi'
-import { publicClient, account } from './client'
+import { billboardAbi, billboardRegistryAbi, distributionAbi } from './abi.js'
+import { publicClient, account } from './client.js'
 
 // number of auctions to be cleared at once
 const BATCH_SIZE = 2
