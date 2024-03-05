@@ -33,6 +33,8 @@ export const sqlSIW = getPostgresJsClient(pgSearchDatabaseURL);
 
 // import { Article } from "../lib/pg-zhparser-articles-indexer.js";
 
+export const ARRAY_TYPE = 1009; // Postgres internal value shouldn't be here;
+
 export interface Article {
   id: string;
   articleId: string;
