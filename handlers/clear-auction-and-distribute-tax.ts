@@ -26,11 +26,11 @@ export const handler = async (
   console.log(`Context: ${JSON.stringify(context, null, 2)}`)
 
   const slack = new Slack()
-  const fromTokenId = BigInt(event.fromTokenId) || BigInt(0)
-  const toTokenId = BigInt(event.toTokenId) || BigInt(0)
-  const fromBlock = BigInt(event.fromBlock) || BigInt(0)
-  const toBlock = BigInt(event.toBlock) || BigInt(0)
-  const amount = BigInt(event.amount) || BigInt(0)
+  const fromTokenId = BigInt(event.fromTokenId || 0)
+  const toTokenId = BigInt(event.toTokenId || 0)
+  const fromBlock = BigInt(event.fromBlock || 0)
+  const toBlock = BigInt(event.toBlock || 0)
+  const amount = BigInt(event.amount || 0)
   const merkleRoot = event.merkleRoot as `0x${string}`
   const treeId = `${fromBlock}-${toBlock}`
 
