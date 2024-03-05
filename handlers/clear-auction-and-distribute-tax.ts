@@ -10,22 +10,25 @@ import {
 } from '../lib/billboard/index.js'
 import { Slack } from '../lib/utils/slack.js'
 
+type RequestBody = {
+  fromTokenId: string
+  toTokenId: string
+  merkleRoot: string
+  // accessToken: string // to protect this API?
+}
+
 export const handler = async (
-  event: APIGatewayEvent & {
-    fromTokenId: string
-    toTokenId: string
-    merkleRoot: string
-    // accessToken: string // to protect this API?
-  },
+  event: APIGatewayEvent,
   context: Context
 ): Promise<APIGatewayProxyResult> => {
   console.log(`Event: ${JSON.stringify(event, null, 2)}`)
   console.log(`Context: ${JSON.stringify(context, null, 2)}`)
 
   const slack = new Slack()
-  const fromTokenId = BigInt(event.fromTokenId || 0)
-  const toTokenId = BigInt(event.toTokenId || 0)
-  const merkleRoot = event.merkleRoot as `0x${string}`
+  const body = (event.body ? JSON.parse(event.body) : {}) as RequestBody
+  const fromTokenId = BigInt(body.fromTokenId || 0)
+  const toTokenId = BigInt(body.toTokenId || 0)
+  const merkleRoot = body.merkleRoot as `0x${string}`
   const treeId = merkleRoot
 
   const isInvalidTokenIds =
