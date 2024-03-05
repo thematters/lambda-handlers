@@ -1,4 +1,3 @@
-
 name: Build & Test
 
 on:
@@ -65,7 +64,7 @@ jobs:
     name: Build Lambda-Handlers Docker Image & Publish to AWS ECR
     needs: build-and-test
     runs-on: ubuntu-latest
- 
+
     steps:
       - uses: actions/checkout@v3
 
@@ -86,5 +85,5 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: v${{ github.head_ref }}-${{ github.sha }}
-          IMAGE_URI: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:v${{ github.head_ref }}-${{ github.sha }}
+          IMAGE_TAG: v${{ github.sha }}
+          IMAGE_URI: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:v${{ github.sha }}
