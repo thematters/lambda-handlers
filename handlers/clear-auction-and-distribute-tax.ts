@@ -7,6 +7,7 @@ import {
   walletClient,
 } from '../lib/billboard'
 import { SimulateContractErrorType } from 'viem'
+import { Slack } from '../lib/utils/slack.js'
 
 export const handler = async (
   event: APIGatewayEvent & {
@@ -23,6 +24,7 @@ export const handler = async (
   console.log(`Event: ${JSON.stringify(event, null, 2)}`)
   console.log(`Context: ${JSON.stringify(context, null, 2)}`)
 
+  const slack = new Slack()
   const fromTokenId = BigInt(event.fromTokenId) || BigInt(0)
   const toTokenId = BigInt(event.toTokenId) || BigInt(0)
   const fromBlock = BigInt(event.fromBlock) || BigInt(0)
@@ -39,9 +41,7 @@ export const handler = async (
   if (isInvalidTokenIds || isInvalidBlockNumbers || isInvalidAmount) {
     return {
       statusCode: 400,
-      body: JSON.stringify({
-        error: 'invalid params',
-      }),
+      body: JSON.stringify({ error: 'invalid params' }),
     }
   }
 
@@ -51,30 +51,59 @@ export const handler = async (
   if (!auctions || auctions.length <= 0) {
     return {
       statusCode: 200,
-      body: JSON.stringify({
-        message: 'no auction to clear.',
-      }),
+      body: JSON.stringify({ message: 'no auction to clear.' }),
     }
   }
 
+  // Step 1: clear auctions
   try {
-    // Step 1: clear auctions
     const clearAuctionsResult = await publicClient.simulateContract({
       ...billboardContract,
       functionName: 'clearAuctions',
       args: [auctions.map(({ tokenId }) => tokenId)],
     })
     await walletClient.writeContract(clearAuctionsResult.request)
+  } catch (err) {
+    const error = err as SimulateContractErrorType
+    console.error(error.name, err)
 
+    slack.sendStripeAlert({
+      data: { event, errorName: error.name },
+      message: 'Failed to clear auctions.',
+    })
+
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ message: error.name }),
+    }
+  }
+
+  let tax: bigint
+  try {
     // Step 2: withdraw tax
     const withdrawTaxResult = await publicClient.simulateContract({
       ...billboardContract,
       functionName: 'withdrawTax',
     })
     await walletClient.writeContract(withdrawTaxResult.request)
-    const tax = withdrawTaxResult.result
+    tax = withdrawTaxResult.result
+  } catch (err) {
+    const error = err as SimulateContractErrorType
+    console.error(error.name, err)
 
-    // Step 3: create new drop with merkle root and tax
+    slack.sendStripeAlert({
+      data: { event, errorName: error.name },
+      message: 'Failed to withdraw tax.',
+    })
+
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ message: error.name }),
+    }
+  }
+
+  // Step 3: create new drop with merkle root and tax
+  try {
     const dropResult = await publicClient.simulateContract({
       ...distributionContract,
       functionName: 'drop',
@@ -98,13 +127,14 @@ export const handler = async (
     const error = err as SimulateContractErrorType
     console.error(error.name, err)
 
-    // TODO: error handling
+    slack.sendStripeAlert({
+      data: { event, errorName: error.name },
+      message: 'Failed to create new drop.',
+    })
 
     return {
       statusCode: 500,
-      body: JSON.stringify({
-        message: error.name,
-      }),
+      body: JSON.stringify({ message: error.name }),
     }
   }
 }

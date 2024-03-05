@@ -16,7 +16,7 @@ export const billboardRegsitryContract = {
 } as const
 
 export const distributionContract = {
-  address: process.env.DISTRIBUTION_CONTRACT_ADDRESS as `0x${string}`,
+  address: process.env.BILLBOARD_DISTRIBUTION_CONTRACT_ADDRESS as `0x${string}`,
   abi: distributionAbi,
   account,
 } as const
