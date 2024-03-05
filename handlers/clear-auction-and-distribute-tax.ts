@@ -46,19 +46,21 @@ export const handler = async (
     }
   }
 
-  // get auctions to be cleared
-  const auctions = await getClearableAuctions({ fromTokenId, toTokenId })
-
-  if (!auctions || auctions.length <= 0) {
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ message: 'no auction to clear.' }),
-    }
-  }
-
   // Step 1: clear auctions
+  let clearedAuctions: string[] = []
   if (fromStep === 'clearAuctions') {
     try {
+      // get auctions to be cleared
+      const auctions = await getClearableAuctions({ fromTokenId, toTokenId })
+
+      if (!auctions || auctions.length <= 0) {
+        return {
+          statusCode: 200,
+          body: JSON.stringify({ message: 'no auction to clear.' }),
+        }
+      }
+      clearedAuctions = auctions.map(({ tokenId }) => tokenId.toString())
+
       const clearAuctionsResult = await publicClient.simulateContract({
         ...billboardContract,
         functionName: 'clearAuctions',
@@ -131,7 +133,7 @@ export const handler = async (
 
   // response
   const data = {
-    auctionIds: auctions.map((a) => a.auctionId.toString()),
+    auctionIds: clearedAuctions,
     totalTax: tax.toString(),
     merkleRoot,
   }
