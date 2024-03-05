@@ -14,7 +14,6 @@ export const handler = async (
   event: APIGatewayEvent & {
     fromTokenId: string
     toTokenId: string
-    amount: string // bigint
     merkleRoot: string
     // accessToken: string // to protect this API?
   },
@@ -26,14 +25,12 @@ export const handler = async (
   const slack = new Slack()
   const fromTokenId = BigInt(event.fromTokenId || 0)
   const toTokenId = BigInt(event.toTokenId || 0)
-  const amount = BigInt(event.amount || 0)
   const merkleRoot = event.merkleRoot as `0x${string}`
   const treeId = merkleRoot
 
   const isInvalidTokenIds =
     fromTokenId <= 0 || toTokenId <= 0 || fromTokenId >= toTokenId
-  const isInvalidAmount = amount <= 0
-  if (isInvalidTokenIds || isInvalidAmount) {
+  if (isInvalidTokenIds) {
     return {
       statusCode: 400,
       body: JSON.stringify({ error: 'invalid params' }),
