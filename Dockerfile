@@ -26,7 +26,7 @@ RUN npm ci --omit=dev
 ## the actual run image
 FROM public.ecr.aws/lambda/nodejs:18
 RUN yum update -y && \
-    yum install postgresql.x86_64 -y
+    yum install postgresql -y
 
 ENV NODE_OPTIONS="--trace-warnings"
 
