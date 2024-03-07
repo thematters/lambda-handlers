@@ -18,7 +18,7 @@ type RequestBody = {
   merkleRoot: string
   fromStep?: Step
   tax?: string // bigint
-  // accessToken: string // to protect this API?
+  accessToken: string // to protect this API?
 }
 
 export const handler = async (
@@ -36,11 +36,12 @@ export const handler = async (
   const treeId = merkleRoot
   const fromStep: Step = body.fromStep || 'clearAuctions'
 
-  slack.sendStripeAlert({
-    data: { event, context },
-    message: 'Start to clear auctions and distribute tax.',
-    state: SLACK_MESSAGE_STATE.successful,
-  })
+  if (body.accessToken !== process.env.ACCESS_TOKEN) {
+    return {
+      statusCode: 403,
+      body: JSON.stringify({ message: 'invalid access token' }),
+    }
+  }
 
   const taxAllocation = process.env.TAX_ALLOCATION
   if (!taxAllocation) {
@@ -90,7 +91,10 @@ export const handler = async (
 
       return {
         statusCode: 500,
-        body: JSON.stringify({ message: error.name }),
+        body: JSON.stringify({
+          data: { step: 'clearAuctions' },
+          message: error.name,
+        }),
       }
     }
   }
@@ -116,7 +120,10 @@ export const handler = async (
 
       return {
         statusCode: 500,
-        body: JSON.stringify({ message: error.name }),
+        body: JSON.stringify({
+          data: { step: 'withdrawTax' },
+          message: error.name,
+        }),
       }
     }
   }
@@ -146,7 +153,10 @@ export const handler = async (
 
       return {
         statusCode: 500,
-        body: JSON.stringify({ message: error.name }),
+        body: JSON.stringify({
+          data: { step: 'drop' },
+          message: error.name,
+        }),
       }
     }
   }
