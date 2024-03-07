@@ -56,7 +56,7 @@ export const handler = async (
     let clearedAuctions: string[] = []
     if (fromStep === 'clearAuctions') {
       const isInvalidTokenIds =
-        fromTokenId <= 0 || toTokenId <= 0 || fromTokenId >= toTokenId
+        fromTokenId <= 0 || toTokenId <= 0 || toTokenId < fromTokenId
       if (isInvalidTokenIds) {
         return {
           statusCode: 400,
