@@ -51,10 +51,10 @@ export const handler = async (
     }
   }
 
-  // Step 1: clear auctions
-  let clearedAuctions: string[] = []
-  if (fromStep === 'clearAuctions') {
-    try {
+  try {
+    // Step 1: clear auctions
+    let clearedAuctions: string[] = []
+    if (fromStep === 'clearAuctions') {
       const isInvalidTokenIds =
         fromTokenId <= 0 || toTokenId <= 0 || fromTokenId >= toTokenId
       if (isInvalidTokenIds) {
@@ -80,119 +80,64 @@ export const handler = async (
         args: [auctions.map(({ tokenId }) => tokenId)],
       })
       await walletClient.writeContract(clearAuctionsResult.request)
-    } catch (err) {
-      const error = err as SimulateContractErrorType
-      console.error(error.name, err)
-
-      await slack.sendStripeAlert({
-        data: {
-          event,
-          name: error.name,
-          message: error.message,
-          cause: error.cause,
-        },
-        message: 'Failed to clear auctions.',
-      })
-
-      return {
-        statusCode: 500,
-        body: JSON.stringify({
-          data: { step: 'clearAuctions' },
-          message: error.name,
-        }),
-      }
     }
-  }
 
-  let tax: bigint = BigInt(body.tax || 0)
-  if (fromStep === 'clearAuctions' || fromStep === 'withdrawTax') {
-    try {
-      // Step 2: withdraw tax
+    // Step 2: withdraw tax
+    let tax: bigint = BigInt(body.tax || 0)
+    if (fromStep === 'clearAuctions' || fromStep === 'withdrawTax') {
       const withdrawTaxResult = await publicClient.simulateContract({
         ...billboardContract,
         functionName: 'withdrawTax',
       })
       await walletClient.writeContract(withdrawTaxResult.request)
       tax = withdrawTaxResult.result
-    } catch (err) {
-      const error = err as SimulateContractErrorType
-      console.error(error.name, err)
-
-      await slack.sendStripeAlert({
-        data: {
-          event,
-          name: error.name,
-          message: error.message,
-          cause: error.cause,
-        },
-        message: 'Failed to withdraw tax.',
-      })
-
-      return {
-        statusCode: 500,
-        body: JSON.stringify({
-          data: { step: 'withdrawTax' },
-          message: error.name,
-        }),
-      }
     }
-  }
 
-  // Step 3: create new drop with merkle root and tax
-  const taxToDrop = (tax * BigInt(taxAllocation)) / BigInt(100)
-  if (
-    fromStep === 'clearAuctions' ||
-    fromStep === 'withdrawTax' ||
-    fromStep === 'drop'
-  ) {
-    try {
+    // Step 3: create new drop with merkle root and tax
+    const taxToDrop = (tax * BigInt(taxAllocation)) / BigInt(100)
+    if (
+      fromStep === 'clearAuctions' ||
+      fromStep === 'withdrawTax' ||
+      fromStep === 'drop'
+    ) {
       const dropResult = await publicClient.simulateContract({
         ...distributionContract,
         functionName: 'drop',
         args: [treeId, merkleRoot, taxToDrop],
       })
       await walletClient.writeContract(dropResult.request)
-    } catch (err) {
-      const error = err as SimulateContractErrorType
-      console.error(error.name, err)
-
-      await slack.sendStripeAlert({
-        data: {
-          event,
-          name: error.name,
-          message: error.message,
-          cause: error.cause,
-        },
-        message: 'Failed to create new drop.',
-      })
-
-      return {
-        statusCode: 500,
-        body: JSON.stringify({
-          data: { step: 'drop' },
-          message: error.name,
-        }),
-      }
     }
-  }
 
-  // response
-  const data = {
-    auctionIds: clearedAuctions,
-    totalTax: tax.toString(),
-    taxToDrop: taxToDrop.toString(),
-    merkleRoot,
-  }
-  await slack.sendStripeAlert({
-    data,
-    message: `Drop ${treeId} with USDT ${formatUnits(taxToDrop, 6)}.`,
-    state: SLACK_MESSAGE_STATE.successful,
-  })
-  return {
-    statusCode: 200,
-    body: JSON.stringify({
-      message: 'done.',
+    // response
+    const data = {
+      auctionIds: clearedAuctions,
+      totalTax: tax.toString(),
+      taxToDrop: taxToDrop.toString(),
+      merkleRoot,
+    }
+    await slack.sendStripeAlert({
       data,
-    }),
+      message: `Drop ${treeId} with USDT ${formatUnits(taxToDrop, 6)}.`,
+      state: SLACK_MESSAGE_STATE.successful,
+    })
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ message: 'done.', data }),
+    }
+  } catch (err) {
+    const error = err as SimulateContractErrorType
+    console.error(error.name, err)
+
+    const data = {
+      name: error.name,
+      message: error.message,
+      cause: error.cause,
+    }
+    await slack.sendStripeAlert({ data, message: error.name })
+
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ data, message: error.name }),
+    }
   }
 }
