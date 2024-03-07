@@ -13,12 +13,12 @@ import { SLACK_MESSAGE_STATE, Slack } from '../lib/utils/slack.js'
 type Step = 'clearAuctions' | 'withdrawTax' | 'drop'
 
 type RequestBody = {
+  accessToken: string // to access this API
   fromTokenId: string // bigint
   toTokenId: string // bigint
   merkleRoot: string
   fromStep?: Step
   tax?: string // bigint
-  accessToken: string // to protect this API?
 }
 
 export const handler = async (
@@ -84,8 +84,13 @@ export const handler = async (
       const error = err as SimulateContractErrorType
       console.error(error.name, err)
 
-      slack.sendStripeAlert({
-        data: { event, errorName: error.name },
+      await slack.sendStripeAlert({
+        data: {
+          event,
+          name: error.name,
+          message: error.message,
+          cause: error.cause,
+        },
         message: 'Failed to clear auctions.',
       })
 
@@ -113,8 +118,13 @@ export const handler = async (
       const error = err as SimulateContractErrorType
       console.error(error.name, err)
 
-      slack.sendStripeAlert({
-        data: { event, errorName: error.name },
+      await slack.sendStripeAlert({
+        data: {
+          event,
+          name: error.name,
+          message: error.message,
+          cause: error.cause,
+        },
         message: 'Failed to withdraw tax.',
       })
 
@@ -146,8 +156,13 @@ export const handler = async (
       const error = err as SimulateContractErrorType
       console.error(error.name, err)
 
-      slack.sendStripeAlert({
-        data: { event, errorName: error.name },
+      await slack.sendStripeAlert({
+        data: {
+          event,
+          name: error.name,
+          message: error.message,
+          cause: error.cause,
+        },
         message: 'Failed to create new drop.',
       })
 
@@ -168,7 +183,7 @@ export const handler = async (
     taxToDrop: taxToDrop.toString(),
     merkleRoot,
   }
-  slack.sendStripeAlert({
+  await slack.sendStripeAlert({
     data,
     message: `Drop ${treeId} with USDT ${formatUnits(taxToDrop, 6)}.`,
     state: SLACK_MESSAGE_STATE.successful,
