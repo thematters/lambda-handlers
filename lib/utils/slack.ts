@@ -5,7 +5,7 @@ const slackToken = process.env.MATTERS_SLACK_TOKEN || ''
 const slackStripeAlertChannel =
   process.env.MATTERS_SLACK_STRIPE_ALERT_CHANNEL || ''
 
-enum SLACK_MESSAGE_STATE {
+export enum SLACK_MESSAGE_STATE {
   canceled = 'canceled',
   failed = 'failed',
   successful = 'successful',

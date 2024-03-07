@@ -8,7 +8,7 @@ import {
   publicClient,
   walletClient,
 } from '../lib/billboard/index.js'
-import { Slack } from '../lib/utils/slack.js'
+import { SLACK_MESSAGE_STATE, Slack } from '../lib/utils/slack.js'
 
 type Step = 'clearAuctions' | 'withdrawTax' | 'drop'
 
@@ -34,8 +34,21 @@ export const handler = async (
   const toTokenId = BigInt(body.toTokenId || 0)
   const merkleRoot = body.merkleRoot as `0x${string}`
   const treeId = merkleRoot
-  const fromStep = body.fromStep || 'clearAuctions'
-  let tax = BigInt(body.tax || 0)
+  const fromStep: Step = body.fromStep || 'clearAuctions'
+
+  slack.sendStripeAlert({
+    data: { event, context },
+    message: 'Start to clear auctions and distribute tax.',
+    state: SLACK_MESSAGE_STATE.successful,
+  })
+
+  const taxAllocation = process.env.TAX_ALLOCATION
+  if (!taxAllocation) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ message: 'no tax allocation' }),
+    }
+  }
 
   // Step 1: clear auctions
   let clearedAuctions: string[] = []
@@ -52,7 +65,6 @@ export const handler = async (
 
       // get auctions to be cleared
       const auctions = await getClearableAuctions({ fromTokenId, toTokenId })
-
       if (!auctions || auctions.length <= 0) {
         return {
           statusCode: 200,
@@ -83,6 +95,7 @@ export const handler = async (
     }
   }
 
+  let tax: bigint = BigInt(body.tax || 0)
   if (fromStep === 'clearAuctions' || fromStep === 'withdrawTax') {
     try {
       // Step 2: withdraw tax
@@ -109,25 +122,32 @@ export const handler = async (
   }
 
   // Step 3: create new drop with merkle root and tax
-  try {
-    const dropResult = await publicClient.simulateContract({
-      ...distributionContract,
-      functionName: 'drop',
-      args: [treeId, merkleRoot, tax],
-    })
-    await walletClient.writeContract(dropResult.request)
-  } catch (err) {
-    const error = err as SimulateContractErrorType
-    console.error(error.name, err)
+  const taxToDrop = (tax * BigInt(taxAllocation)) / BigInt(100)
+  if (
+    fromStep === 'clearAuctions' ||
+    fromStep === 'withdrawTax' ||
+    fromStep === 'drop'
+  ) {
+    try {
+      const dropResult = await publicClient.simulateContract({
+        ...distributionContract,
+        functionName: 'drop',
+        args: [treeId, merkleRoot, taxToDrop],
+      })
+      await walletClient.writeContract(dropResult.request)
+    } catch (err) {
+      const error = err as SimulateContractErrorType
+      console.error(error.name, err)
 
-    slack.sendStripeAlert({
-      data: { event, errorName: error.name },
-      message: 'Failed to create new drop.',
-    })
+      slack.sendStripeAlert({
+        data: { event, errorName: error.name },
+        message: 'Failed to create new drop.',
+      })
 
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: error.name }),
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ message: error.name }),
+      }
     }
   }
 
@@ -135,11 +155,13 @@ export const handler = async (
   const data = {
     auctionIds: clearedAuctions,
     totalTax: tax.toString(),
+    taxToDrop: taxToDrop.toString(),
     merkleRoot,
   }
   slack.sendStripeAlert({
     data,
-    message: `Drop ${treeId} with USDT ${formatUnits(tax, 6)}.`,
+    message: `Drop ${treeId} with USDT ${formatUnits(taxToDrop, 6)}.`,
+    state: SLACK_MESSAGE_STATE.successful,
   })
   return {
     statusCode: 200,
