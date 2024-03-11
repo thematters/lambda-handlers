@@ -23,7 +23,7 @@
     "dotenv": "^16.0.3",
     "eslint": "^8.29.0",
     "jest": "^29.3.1",
-    "prettier": "^2.8.1",
+    "prettier": "^2.8.8",
     "ts-jest": "^29.0.3",
     "ts-node": "^10.9.1",
     "typescript": "^5.3.3"
@@ -57,6 +57,11 @@
     "pg": "^8.8.0",
     "postgres": "^3.3.2",
     "stripe": "^11.10.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "viem": "^1.21.4"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "semi": false
   }
 }

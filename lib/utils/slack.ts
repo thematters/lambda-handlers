@@ -1,54 +1,56 @@
-import { WebClient } from "@slack/web-api";
+import { WebClient } from '@slack/web-api'
 
-const mattersEnv = process.env.MATTERS_ENV || "";
-const slackToken = process.env.MATTERS_SLACK_TOKEN || "";
+const mattersEnv = process.env.MATTERS_ENV || ''
+const slackToken = process.env.MATTERS_SLACK_TOKEN || ''
 const slackStripeAlertChannel =
-  process.env.MATTERS_SLACK_STRIPE_ALERT_CHANNEL || "";
+  process.env.MATTERS_SLACK_STRIPE_ALERT_CHANNEL || ''
 
-enum SLACK_MESSAGE_STATE {
-  canceled = "canceled",
-  failed = "failed",
-  successful = "successful",
+export enum SLACK_MESSAGE_STATE {
+  canceled = 'canceled',
+  failed = 'failed',
+  successful = 'successful',
 }
 
 export class Slack {
-  client: WebClient;
+  client: WebClient
 
   constructor() {
-    this.client = new WebClient(slackToken);
+    this.client = new WebClient(slackToken)
   }
 
   sendStripeAlert = async ({
     data,
     message,
+    state = SLACK_MESSAGE_STATE.failed,
   }: {
-    data?: Record<string, any> | null;
-    message: string;
+    data?: Record<string, any> | null
+    message: string
+    state?: SLACK_MESSAGE_STATE
   }) => {
     await this.client.chat.postMessage({
       channel: slackStripeAlertChannel,
       text: `[${mattersEnv}] - Alert`,
       attachments: [
         {
-          color: this.getMessageColor(SLACK_MESSAGE_STATE.failed),
+          color: this.getMessageColor(state),
           text:
-            "\n" +
+            '\n' +
             `\n- *Message*: ${message}` +
             `\n- *Data*: ${JSON.stringify(data || {})}`,
         },
       ],
       markdownn: true,
-    });
-  };
+    })
+  }
 
   private getMessageColor = (state: SLACK_MESSAGE_STATE) => {
     switch (state) {
       case SLACK_MESSAGE_STATE.successful:
-        return "#27ffc9";
+        return '#27ffc9'
       case SLACK_MESSAGE_STATE.failed:
-        return "#ff275d";
+        return '#ff275d'
       default:
-        return "#ffc927";
+        return '#ffc927'
     }
-  };
+  }
 }
