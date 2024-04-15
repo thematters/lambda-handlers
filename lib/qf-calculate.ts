@@ -43,14 +43,28 @@ export const s3FilePathPrefix = isProd ? `rounds` : `web-develop/rounds`
 
 export const MattersBillboardS3Bucket = 'matters-billboard'
 
+const knownCollectiveSenders = new Set(
+  (
+    process.env.KNOWN_COLLECTIVE_SENDERS || // a comman separated list of known collective senders
+    ''
+  )
+    .split(/,\s*/)
+    .map((w) => w.trim())
+    .filter(Boolean)
+  // ['imo_treasury']
+)
+
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '' // for servide side run only;
+
+const UINT256_MAX_BIGINT =
+  0x0_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffffn // uint256max
 
 export async function calculateQFScore({
   // between = ["2023-12-01", "2023-12-31T23:59:59.999Z"],
   fromTime,
   toTime,
   fromBlock,
-  toBlock,
+  toBlock = UINT256_MAX_BIGINT,
   finalize,
   amountTotal = 250_000_000n, // 250 USDT
   sharesTotal = 10_000,
@@ -60,7 +74,7 @@ export async function calculateQFScore({
   fromTime?: Date
   toTime?: Date
   fromBlock: bigint
-  toBlock: bigint
+  toBlock?: bigint
   amountTotal?: bigint
   sharesTotal?: number
   finalize?: boolean
@@ -167,6 +181,7 @@ export async function calculateQFScore({
   )
 
   const seqsByDataHash = d3.group(seqs, (d) => d.dataHash)
+  // const seqsByFrom = d3.group(seqs, (d) => d.from)
   console.log(new Date(), `found ${seqs?.length} seqs between:`, seqsByDataHash)
 
   // console.log("contract logs: %o", logs);
@@ -176,8 +191,9 @@ export async function calculateQFScore({
     fromAddresses: new Set<string>(),
     toAddresses: new Set<string>(),
     allAddresses: new Set<string>(),
+    pairFromToAddresses: new Set<string>(),
     token: new Set<string>(),
-    uri: new Set<string>(),
+    uris: new Set<string>(),
     amount: [] as bigint[],
     eventName: new Set<string>(),
   }
@@ -193,10 +209,11 @@ export async function calculateQFScore({
     stats.toAddresses.add(log.args.to)
     stats.allAddresses.add(log.args.from)
     stats.allAddresses.add(log.args.to)
+    stats.pairFromToAddresses.add(`${log.args.from}:${log.args.to}`)
     stats.token.add(log.args.token)
-    stats.uri.add(log.args.uri)
-    stats.amount.push(log.args.amount)
+    stats.uris.add(log.args.uri)
     stats.eventName.add(log.eventName)
+    stats.amount.push(log.args.amount)
   })
   stats.amount.sort(ascending)
 
@@ -307,28 +324,54 @@ ORDER BY article.id DESC ; `)
 
   const usdtDonationsStats = (
     await sqlRO`--get stats of all USDT transactions;
-SELECT COUNT(*) ::int AS num_transactions,
-  COUNT(DISTINCT sender_id) ::int AS num_senders,
-  COUNT(DISTINCT recipient_id) ::int AS num_recipients,
-  COUNT(DISTINCT target_id) ::int AS num_targets,
-  json_build_object(
-    'min', MIN(amount),
-    'p05', ROUND(percentile_cont(0.05) within group (order by amount asc) ::numeric, 6),
-    'p10', ROUND(percentile_cont(0.1) within group (order by amount asc) ::numeric, 6),
-    'p25', ROUND(percentile_cont(0.25) within group (order by amount asc) ::numeric, 6),
-    'p50', ROUND(percentile_cont(0.5) within group (order by amount asc) ::numeric, 6),
-    'p75', ROUND(percentile_cont(0.75) within group (order by amount asc) ::numeric, 6),
-    'p90', ROUND(percentile_cont(0.9) within group (order by amount asc) ::numeric, 6),
-    'p95', ROUND(percentile_cont(0.95) within group (order by amount asc) ::numeric, 6),
-    'max', MAX(amount),
-    'sum', SUM(amount),
-    'avg', ROUND(AVG(amount), 6)
-  ) AS amount_stats
-FROM public.transaction
-WHERE purpose='donation' AND state='succeeded'
-  AND currency='USDT'
-  AND target_type=4 -- for articles;
-  AND created_at BETWEEN ${fromTime!} AND ${toTime!} ;`
+WITH trans AS (
+  SELECT sender_id, recipient_id, target_id, amount, created_at
+  FROM public.transaction
+  WHERE purpose='donation' AND state='succeeded'
+    AND currency='USDT'
+    AND target_type=4 -- for articles;
+    AND created_at BETWEEN ${fromTime!} AND ${toTime!}
+)
+
+SELECT * FROM (
+  SELECT COUNT(*) ::int AS num_transactions,
+    COUNT(DISTINCT sender_id) ::int AS num_senders,
+    COUNT(DISTINCT recipient_id) ::int AS num_recipients,
+    -- COUNT(DISTINCT recipient_id) ::int AS num_accounts,
+    COUNT(DISTINCT target_id) ::int AS num_targets,
+    json_build_object(
+      'min', MIN(amount),
+      'p05', ROUND(percentile_cont(0.05) within group (order by amount asc) ::numeric, 6),
+      'p10', ROUND(percentile_cont(0.1) within group (order by amount asc) ::numeric, 6),
+      'p25', ROUND(percentile_cont(0.25) within group (order by amount asc) ::numeric, 6),
+      'p50', ROUND(percentile_cont(0.5) within group (order by amount asc) ::numeric, 6),
+      'p75', ROUND(percentile_cont(0.75) within group (order by amount asc) ::numeric, 6),
+      'p90', ROUND(percentile_cont(0.9) within group (order by amount asc) ::numeric, 6),
+      'p95', ROUND(percentile_cont(0.95) within group (order by amount asc) ::numeric, 6),
+      'max', MAX(amount),
+      'sum', SUM(amount),
+      'avg', ROUND(AVG(amount), 6)
+    ) AS amount_stats,
+    MIN(created_at) AS earliest_donated,
+    MAX(created_at) AS latest_donated
+  FROM trans
+) t1, (
+  SELECT COUNT(*) ::int AS num_pairs
+  FROM (
+    SELECT sender_id, recipient_id, COUNT(*) ::int
+    FROM trans
+    GROUP BY 1, 2
+  ) t
+) t2, (
+  SELECT COUNT(DISTINCT id) ::int AS num_accounts
+  FROM (
+    SELECT DISTINCT sender_id id
+    FROM trans
+    UNION
+    SELECT DISTINCT recipient_id id
+    FROM trans
+  ) t
+) t3 ;`
   )?.[0]
 
   const statsSummary = {
@@ -337,27 +380,38 @@ WHERE purpose='donation' AND state='succeeded'
     fromAddresses: stats.fromAddresses.size,
     toAddresses: stats.toAddresses.size,
     allAddresses: stats.allAddresses.size,
+    pairFromToAddresses: stats.pairFromToAddresses.size,
+    uris: stats.uris.size,
+    fromTime,
+    toTime,
+    fromBlock,
+    toBlock,
+    minBlockNumber,
+    maxBlockNumber,
     token:
       stats.token.size === 1 ? Array.from(stats.token)[0] : stats.token.size,
     eventName:
       stats.eventName.size === 1
         ? Array.from(stats.eventName)[0]
         : stats.eventName.size,
-    uri: stats.uri.size,
-    amount: {
+    amountStats: {
       ...statsAmount,
-      sum_u$: +(Number(statsAmount.sum) / 1e6).toFixed(6),
+      sum_u$: +(Number(statsAmount.sum) / 1e6), // .toFixed(6),
       avg_u$: +(Number(statsAmount.sum) / 1e6 / stats.amount.length).toFixed(6),
     },
   }
-  console.log('stats:', stats, statsSummary, {
-    numIPFSCids: ipfsArticleHashes.length,
-    ...usdtDonationsStats,
-  })
+  console.log(
+    'statsSummary:', // stats,
+    statsSummary,
+    {
+      numIPFSCids: ipfsArticleHashes.length,
+      ...usdtDonationsStats,
+    }
+  )
 
   const dateFormat = new Intl.DateTimeFormat('zh-tw', {
     dateStyle: 'full',
-    timeStyle: 'long',
+    timeStyle: 'short', // 'long',
     timeZone: 'Asia/Taipei',
   })
   const runningBetween = `During MattersCuration contract runtime between \`${dateFormat.format(
@@ -377,19 +431,58 @@ WHERE purpose='donation' AND state='succeeded'
   // output senders.tsv
   const sendersOut = new Map<string, any>()
 
+  const authors =
+    await sqlRO`-- find out authors in the distribs; send qf distrib notifications to qualified authors
+SELECT -- DISTINCT ON (u.id)
+  u.user_name, u.display_name, lower(u.eth_address) AS eth_address,
+  crypto_wallet.count_addresses,
+  (crypto_wallet.count_addresses > 1) AS wallet_changes
+FROM public.user u
+LEFT JOIN (
+  SELECT user_id, COUNT(DISTINCT address) ::int AS count_addresses,
+    MAX(updated_at) AS updated_at
+  FROM public.crypto_wallet_signature
+  WHERE updated_at BETWEEN ${fromTime!} AND ${toTime!} -- ::date - '14 days' ::interval
+  GROUP BY 1
+) crypto_wallet ON user_id=u.id
+WHERE lower(u.eth_address) = ANY(${Array.from(stats.toAddresses, (addr) =>
+      addr.toLowerCase()
+    )})
+  -- AND state IN ('active')
+  -- AND ((extra->'lastQfNotifiedAt') IS NULL OR (extra->>'lastQfNotifiedAt') ::timestamp <= $ {roundEndedAt} ::timestamp)
+-- ORDER BY u.id, crypto_wallet.updated_at DESC NULLS LAST ; `
+  const authorsByAddress = d3.index(authors, (d) => d.ethAddress.toLowerCase())
+  // console.log(`got all ${authors.length} authorsByAddress:`, authorsByAddress)
+
+  const aggPerAuthorAddress = d3.rollup(
+    seqs,
+    (g) => ({
+      amounts: g.map((d) => d.amount).sort(d3.ascending),
+      latestBlockNumber: BigIntMath.max(...g.map((d) => d.blockNumber)),
+      count_contributions: g.length,
+      count_distinct_uris: new Set(g.map((d) => d.uri)).size,
+      sendersAddresses: new Set(g.map((d) => d.from)),
+      sum: g.reduce((acc, b) => acc + b.amount, 0n),
+    }),
+    (d) => d.to.toLowerCase() // lower
+  )
+
   {
     const aggPerFromAddress = d3.rollup(
       seqs,
       (g) => ({
         amounts: g.map((d) => d.amount).sort(d3.ascending),
         latestBlockNumber: BigIntMath.max(...g.map((d) => d.blockNumber)),
-        number_contributions: g.length,
+        count_contributions: g.length,
+        count_distinct_uris: new Set(g.map((d) => d.uri)).size,
+        // count_distinct_authors: new Set(g.map((d) => d.to)).size,
+        authorsAddresses: new Set(g.map((d) => d.to)),
         sum: g.reduce((acc, b) => acc + b.amount, 0n),
       }),
       (d) => d.from.toLowerCase() // lower
     )
-    console.log(new Date(), 'aggPerFromAddress:', aggPerFromAddress)
-    const addresses: string[] = Array.from(aggPerFromAddress.keys())
+    // console.log(new Date(), 'aggPerFromAddress:', aggPerFromAddress)
+    const senderAddresses: string[] = Array.from(aggPerFromAddress.keys()) // all lower cased
 
     const senders = await (isProd
       ? sqlRO`-- get all sender's social
@@ -486,7 +579,7 @@ LEFT JOIN (
   GROUP BY 1
 ) ub ON ub.user_id=sender.id
 -- LEFT JOIN public.user_badge ub ON ub.user_id=sender.id AND ub.type='seed' AND ub.enabled
-WHERE lower(sender.eth_address) =ANY(${addresses!})
+WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
 -- ORDER BY sender.id DESC ;`
       : sqlRO`-- get all sender's social
 SELECT sender.user_name, display_name, to_jsonb(sag.*) AS sag, to_jsonb(sat.*) AS sat,
@@ -561,7 +654,7 @@ LEFT JOIN (
   GROUP BY 1
 ) ub ON ub.user_id=sender.id
 -- LEFT JOIN public.user_badge ub ON ub.user_id=sender.id AND ub.type='seed' AND ub.enabled
-WHERE lower(sender.eth_address) =ANY(${addresses!})
+WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
 -- ORDER BY sender.id DESC ;`)
 
     const sendersMap = new Map(senders.map((u) => [u.ethAddress, u]))
@@ -573,7 +666,6 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
         displayName: senderObj?.displayName,
         ethAddress: k,
         trustPoints: 0.0,
-        countDonations: v.number_contributions,
         sumDonations: v.sum,
         hasAvatar: senderObj?.hasAvatar,
         hasDescription: senderObj?.hasDescription,
@@ -601,7 +693,19 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
         // "title (earliest)",
         titles: senderObj?.titles,
         amounts: v.amounts,
+        // count_contributions: v.amounts.length,
+        // count_distinct_uris: senderObj?.titles?.length,
+        // count_distinct_senders: v.authorsAddresses.size,
+        count_contributions: v.count_contributions,
+        count_distinct_uris: v.count_distinct_uris,
+        count_distinct_authors: v.authorsAddresses.size,
+        authorsDonated: Array.from(v.authorsAddresses, (addr) => {
+          const aut = authorsByAddress.get(addr.toLowerCase())
+          if (!aut) return 'unknown N/A'
+          return `${aut.displayName} (@${aut.userName})`
+        }),
         trustExpr: '',
+        trustPointsOrig: undefined as number | undefined,
       }
       const points = checkSendersTrustPoints(obj)
       obj.trustPoints = d3.sum(Object.values(points))
@@ -609,6 +713,10 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
         compact: true,
         breakLength: Infinity,
       })})`
+      if (knownCollectiveSenders.has(obj.userName)) {
+        obj.trustPointsOrig = obj.trustPoints
+        obj.trustPoints = 0
+      }
       sendersOut.set(k, obj)
     })
 
@@ -617,8 +725,38 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
     })
   }
 
-  const aggPerProj = d3.rollup(
+  const seqQualifiedGroups = d3.group(
     seqs,
+    // filter out non-ipfs url
+    // filter out if the sender has too low trust points;
+    // filter out if the recipient address no longer has a matters account;
+    ({ from, to, dataHash }) =>
+      !!(
+        (
+          dataHash &&
+          dataHashMappings.has(dataHash) &&
+          (!isProd || // no threshold on web-develop
+            sendersOut.get(from.toLowerCase()).trustPoints > 0)
+        ) // threshold on Prod is 0 for now, will need to change later
+      )
+  )
+  console.log(
+    new Date(),
+    `qualified transactions: from ${seqs.length} to ${
+      seqQualifiedGroups.get(true)?.length
+    } and ${seqQualifiedGroups.get(false)?.length}`,
+    {
+      disqualifedAddresses: d3.difference(
+        stats.toAddresses,
+        seqQualifiedGroups.get(true)!.map(({ to }) => to)
+      ),
+      disqualifed: seqQualifiedGroups.get(false),
+    }
+  )
+
+  const seqQualified = seqQualifiedGroups.get(true)!
+  const aggPerProj = d3.rollup(
+    seqQualified, // seqs,
     (g) => ({
       amounts: g.map((d) => d.amount).sort(d3.ascending),
       to: Array.from(new Set(g.map((d) => d.to))),
@@ -626,7 +764,7 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
         ...g.map((d) => d.blockNumber)
       ) as bigint,
       // number_donations
-      number_contributions: g.length,
+      count_contributions: g.length,
       number_contribution_addresses: new Set(g.map((d) => d.from)).size,
       // .sort( d3.ascending // (a, b) => a == null || b == null ? NaN : a < b ? -1 : a > b ? 1 : a >= b ? 0 : NaN , // https://github.com/d3/d3-array/blob/main/src/ascending.js
       sum: g.reduce((acc, b) => acc + b.amount, 0n),
@@ -634,19 +772,10 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
     (d) =>
       (dataHashMappings.get(d.dataHash)?.[0]?.dataHash ?? d.dataHash) || d.uri // d.dataHash || d.uri
   )
-  console.log('for seqs contrib:', aggPerProj)
+  // console.log('for seqs contrib:', aggPerProj)
 
   const aggPerProjFrom = d3.rollup(
-    seqs.filter(
-      // filter out non-ipfs url
-      // filter out if the sender has too low trust points;
-      // filter out if the recipient address no longer has a matters account;
-      ({ from, to, dataHash }) =>
-        dataHash &&
-        dataHashMappings.has(dataHash) &&
-        (!isProd || // no threshold on web-develop
-          sendersOut.get(from.toLowerCase()).trustPoints > 0) // threshold on Prod is 0 for now, will need to change later
-    ),
+    seqQualified,
     (g) => ({
       amounts: g.map((d) => d.amount),
       sum: g.reduce((acc, b) => acc + b.amount, 0n), // d3.sum(g, (d) => d.amount),
@@ -660,7 +789,7 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
   const pair_totals = get_totals_by_pair(aggPerProjFrom)
 
   const clrs = calculate_clr(aggPerProjFrom, pair_totals, amountTotal)
-  console.log('for seqs contrib pairs clrs:', pair_totals, clrs)
+  // console.log('for seqs contrib pairs clrs:', pair_totals, clrs)
 
   // (1)
   // [cid, address, amount]
@@ -679,6 +808,8 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
         clr_percent_pairw,
         clr_amount_orig,
         clr_percent_orig,
+        clr_amount_q4,
+        clr_percent_q4,
         shares,
         // url, created_at, author_eth, // tot, _q_summed,
       } = clrsMap.get(proj) || {}
@@ -697,15 +828,17 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
       values.push({
         id: proj,
         title: dataHashAttributes?.[0]?.title,
-        number_contributions: aggPerProj.get(proj)?.number_contributions,
+        count_contributions: aggPerProj.get(proj)?.count_contributions,
         number_contribution_addresses:
           aggPerProj.get(proj)?.number_contribution_addresses,
         contribution_amount: aggPerProj.get(proj)?.sum,
+        shares,
         clr_amount_pairw,
         clr_percent_pairw,
         clr_amount_orig,
         clr_percent_orig,
-        shares,
+        clr_amount_q4,
+        clr_percent_q4,
         url: dataHashAttributes?.[0]?.url || proj,
         published: dataHashAttributes?.[0]?.createdAt,
         author_eth: dataHashAttributes?.[0]?.ethAddress,
@@ -713,10 +846,14 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
         userName: dataHashAttributes?.[0]?.userName,
         displayName: dataHashAttributes?.[0]?.displayName,
         email: dataHashAttributes?.[0]?.email,
-        authorId: dataHashAttributes?.[0]?.authorId,
+        // authorId: dataHashAttributes?.[0]?.authorId,
         // created_at,
         // author_eth, // tot, _q_summed,
         amounts: aggPerProj.get(proj)?.amounts,
+        amountsMerged: Array.from(
+          aggPerProjFrom.get(proj)!.values(),
+          (d) => d.sum
+        ),
       })
 
       // [ id, address, amount ],
@@ -730,6 +867,73 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
 
     const distrib = (gist.files[`distrib.tsv`] = {
       content: tsvFormat(values), // bufs.join('\n'),
+    })
+
+    const distribByAuthor = d3.rollup(
+      values,
+      (groups) => {
+        const urls = new Set(groups.map((d) => d.url))
+        return {
+          shares: d3.sum(groups, (d) => d.shares),
+          clr_amount: groups.reduce((acc, d) => acc + d.clr_amount_orig, 0n),
+          countDistinctUrls: urls.size,
+          titles: Array.from(new Set(groups.map((d) => d.title))),
+          count_contributions: d3.sum(groups, (d) => d.count_contributions),
+          contribution_amount: groups.reduce(
+            (acc, d) => acc + d.contribution_amount,
+            0n
+          ),
+          amounts: groups
+            .map((d) => d.amounts)
+            .flat(1)
+            .sort(d3.ascending),
+          // amountsMerged: groups .map((d) => d.amountsMerged) .flat(1) .sort(d3.ascending),
+        }
+      },
+      (d) => d.userName
+    )
+    const distribAuthors = (gist.files[`authors.tsv`] = {
+      content: tsvFormat(
+        authors.map((aut) => {
+          const { userName, displayName, ethAddress } = aut
+          const {
+            count_contributions,
+            count_distinct_uris,
+            sendersAddresses,
+            amounts,
+            sum,
+          } = aggPerAuthorAddress.get(ethAddress.toLowerCase()) || {}
+          const {
+            shares,
+            clr_amount,
+            // countDistinctUrls, // count_contributions, // contribution_amount, // amounts,
+            titles,
+          } = distribByAuthor.get(userName) || {}
+          // sendersOut
+
+          return {
+            userName,
+            displayName,
+            ethAddress,
+            shares,
+            clr_amount,
+            // countDistinctUrls, // count_contributions,
+            count_contributions,
+            count_distinct_uris,
+            count_distinct_senders: sendersAddresses?.size ?? 0,
+            contribution_amount: sum,
+            titles,
+            amounts,
+            senders:
+              sendersAddresses &&
+              Array.from(sendersAddresses, (addr) => {
+                const sut = sendersOut.get(addr.toLowerCase())
+                if (!sut) return ''
+                return `${sut.displayName} (@${sut.userName})`
+              }),
+          }
+        })
+      ), // bufs.join('\n'),
     })
 
     const distribJSON = (gist.files[`distrib.json`] = {
@@ -869,6 +1073,11 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
         toBlock,
         minBlockNumber,
         maxBlockNumber,
+        transactionHashes: stats.transactionHashes.size,
+        fromAddresses: stats.fromAddresses.size,
+        toAddresses: stats.toAddresses.size,
+        allAddresses: stats.allAddresses.size,
+        pairFromToAddresses: stats.pairFromToAddresses.size,
         // treeValues is list of tuple(cid string, address, share)
         cidsCount: new Set(Array.from(treeValues, (d) => d[0])).size,
         authorsCount: new Set(Array.from(treeValues, (d) => d[1])).size,
@@ -898,18 +1107,19 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
   }
 
   let gist_url: string | undefined = undefined
+  // skip if no GITHUB_TOKEN
+  console.log('to write_gist', !!(write_gist && GITHUB_TOKEN))
   if (write_gist && GITHUB_TOKEN) {
-    // skip if no GITHUB_TOKEN
-    await fetch('https://api.github.com/gists', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${GITHUB_TOKEN}`,
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-      body: JSON.stringify(gist),
-    })
-      .then(async (res) => {
+    try {
+      const resGist = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${GITHUB_TOKEN}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+        body: JSON.stringify(gist),
+      }).then(async (res) => {
         try {
           return await res.json()
         } catch (err) {
@@ -917,13 +1127,14 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
           console.log(await res.text())
         }
       })
-      .then((data) => {
-        // console.log(data);
-        gist_url = data?.html_url
-      })
-      .catch((err) => {
-        console.error(new Date(), `failed POST to gist:`, err, 'with:', gist)
-      })
+
+      // console.log('gist res:', resGist)
+      gist_url = resGist?.html_url
+    } catch (err) {
+      console.error(new Date(), `failed POST to gist:`, err, 'with:', gist)
+    } finally {
+      console.log('set gist url:', gist_url)
+    }
   }
 
   await Promise.all(
@@ -931,6 +1142,7 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
       'README.md',
       'distrib.json',
       'distrib.tsv',
+      'authors.tsv',
       'senders.tsv',
       'treedump.json',
     ].map(
@@ -949,7 +1161,13 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
     Body: gist.files[`rounds.json`].content,
     // ACL: "public-read",
     ContentType: 'application/json',
-  }).then((res) => console.log(new Date(), `s3 saved rounds:`, rounds))
+  }).then((res) =>
+    console.log(
+      new Date(),
+      `s3 saved ${rounds.length} rounds:`,
+      rounds[rounds.length - 1]
+    )
+  )
 
   return { root: tree.root, gist_url }
 
@@ -967,17 +1185,19 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
     total_shares = 10_000,
     {
       M = 25_000_000n, // 25 USDT Dollars
-      N = 1_000n, // median is $0.1 USDT Dollar
+      N = 100_000n, // median is $0.1 USDT Dollar
     } = {}
   ) {
     let bigtot = 0n
-    let _q_bigsummed = 0.0
+    let _q_bigsummed = 0.0,
+      _q4_bigsummed = 0.0
     const totals = []
     for (const [proj, contribz] of aggregated_contributions.entries()) {
       let tot = 0n
       let _num = 0,
         _sum = 0n,
-        _q_summed = 0.0
+        _q_summed = 0.0,
+        _q4_summed = 0.0
       // const _amounts = [];
 
       // pairwise match
@@ -986,6 +1206,7 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
         _sum += v1.sum
         // _amounts.push(...v1.amounts);
         _q_summed += Math.sqrt(Number(v1.sum))
+        _q4_summed += Math.pow(Number(v1.sum), 1 / 4)
 
         for (const [k2, v2] of contribz.entries()) {
           if (k2 > k1) {
@@ -1003,6 +1224,7 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
 
       bigtot += tot
       _q_bigsummed += _q_summed
+      _q4_bigsummed += _q4_summed
 
       totals.push({
         id: proj,
@@ -1015,12 +1237,15 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
         clr_percent_pairw: 0.0,
         clr_amount_orig: 0n,
         clr_percent_orig: 0.0,
+        clr_amount_q4: 0n,
+        clr_percent_q4: 0.0,
         shares: 0, // of 10_000 shares, simulate floating points
         // url: dataHashMappings.get(proj)?.url || proj,
         created_at: dataHashMappings.get(proj)?.[0]?.createdAt,
         author_eth: dataHashMappings.get(proj)?.[0]?.ethAddress,
         tot,
         _q_summed,
+        _q4_summed,
         // amounts: _amounts.sort(ascending),
       })
     }
@@ -1031,8 +1256,12 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
         (total_pot * BigInt(Math.round(proj.clr_percent_pairw * 1e18))) /
         BigInt(1e18)
       proj.clr_percent_orig = proj._q_summed / _q_bigsummed
+      proj.clr_percent_q4 = proj._q4_summed / _q4_bigsummed
       proj.clr_amount_orig =
         BigInt(Math.round(Number(total_pot) * proj.clr_percent_orig * 1e6)) /
+        1_000_000n
+      proj.clr_amount_q4 =
+        BigInt(Math.round(Number(total_pot) * proj.clr_percent_q4 * 1e6)) /
         1_000_000n
       proj.shares = Math.round((total_shares * proj._q_summed) / _q_bigsummed)
     }
@@ -1064,6 +1293,19 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
           `adjust [${firstNonZero}].clr_amount_orig: from ${totals[firstNonZero].clr_amount_orig} to ${rem}`
         )
         totals[firstNonZero].clr_amount_orig = rem
+      }
+
+      rem = total_pot
+      firstNonZero = totals.findIndex((p) => p.clr_amount_q4 > 0n)
+      for (let i = firstNonZero + 1; i < totals.length; i++) {
+        rem -= totals[i].clr_amount_q4
+      }
+      if (totals[firstNonZero].clr_amount_q4 != rem) {
+        console.log(
+          new Date(),
+          `adjust [${firstNonZero}].clr_amount_q4: from ${totals[firstNonZero].clr_amount_q4} to ${rem}`
+        )
+        totals[firstNonZero].clr_amount_q4 = rem
       }
 
       let remsh = total_shares
