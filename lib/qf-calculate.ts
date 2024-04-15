@@ -21,7 +21,8 @@ import {
   publicClientPolygonMainnet,
   getETHMainetNFTs,
   AddressMattersTravLoggerContract,
-  AddressENSDomainContract,
+  // AddressENSDomainContract,
+  AddressENSDomainContracts,
   AddressMattersOPCurationContract,
   AddressMattersOPSepoliaCurationContract,
   MattersCurationEvent,
@@ -94,8 +95,8 @@ export async function calculateQFScore({
       res1 // new Date(+res1?.timeStamp * 1e3)
     )
     if (res1?.timestamp) {
-      let fromTimestamp = +Number(res1.timestamp)
-      if (fromTimestamp % 2 === 1) fromTimestamp++ // every OP block is around ~2 seconds, if it starts with odd number, round it to next even;
+      const fromTimestamp = +Number(res1.timestamp)
+      // if (fromTimestamp % 2 === 1) fromTimestamp++ // every OP block is around ~2 seconds, if it starts with odd number, round it to next even;
       fromTime = new Date(fromTimestamp * 1e3)
     }
     const res2 = await // EtherScanAPI.getBlockReward({ blockno: toBlock })
@@ -107,8 +108,8 @@ export async function calculateQFScore({
       // new Date(+res2?.timeStamp * 1e3)
     )
     if (res2?.timestamp) {
-      let toTimestamp = +Number(res2.timestamp)
-      if (toTimestamp % 2 === 1) toTimestamp++
+      const toTimestamp = +Number(res2.timestamp)
+      // if (toTimestamp % 2 === 1) toTimestamp++
       toTime = new Date(toTimestamp * 1e3)
     }
   }
@@ -215,17 +216,20 @@ export async function calculateQFScore({
       const travLoggers = res?.contracts?.find(
         (row: any) => row?.address === AddressMattersTravLoggerContract
       )?.totalBalance
-      const ensDomains = res?.contracts?.find(
-        (row: any) => row?.address === AddressENSDomainContract
-      )?.totalBalance
+      const ensDomains = +d3.sum(
+        res?.contracts?.filter(
+          (row: any) => AddressENSDomainContracts.has(row?.address) // === AddressENSDomainContract
+        ),
+        (d: any) => +d.totalBalance
+      )
       const totalCount = // d3.sum(
         res?.contracts.reduce(
           (acc: number, row: any) => acc + +row.totalBalance,
           0
         )
       nftHoldersMap.set(address.toLowerCase(), {
-        travLoggers: travLoggers && parseInt(travLoggers),
-        ensDomains: ensDomains && parseInt(ensDomains),
+        travLoggers: travLoggers ? parseInt(travLoggers) : undefined,
+        ensDomains, // : ensDomains && parseInt(ensDomains),
         totalCount,
         totalContracts: res?.totalCount,
       })
@@ -616,7 +620,7 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
   const aggPerProj = d3.rollup(
     seqs,
     (g) => ({
-      amounts: g.map((d) => d.amount).sort(ascending),
+      amounts: g.map((d) => d.amount).sort(d3.ascending),
       to: Array.from(new Set(g.map((d) => d.to))),
       latestBlockNumber: BigIntMath.max(
         ...g.map((d) => d.blockNumber)
@@ -656,7 +660,7 @@ WHERE lower(sender.eth_address) =ANY(${addresses!})
   const pair_totals = get_totals_by_pair(aggPerProjFrom)
 
   const clrs = calculate_clr(aggPerProjFrom, pair_totals, amountTotal)
-  console.log('for seqs contrib pairs clrs:', clrs)
+  console.log('for seqs contrib pairs clrs:', pair_totals, clrs)
 
   // (1)
   // [cid, address, amount]
@@ -1165,12 +1169,13 @@ WHERE user_name = ANY (${Array.from(authorGroups.keys())})
   if (!doNotify) return
 
   await Promise.all([
-    sendQfNotificationEmails(items, doNotify), // make sure finishes sending emails first...
-
+    sendQfNotificationEmails(items, doNotify),
     sendQfNotifInsite(items, doNotify),
   ])
 
-  const retDoUpdateLastNotified = await sql`-- do update
+  // do update each user's lastQfNotifiedAt timestamp, make be able to re-run whole round for partial failure
+  const retDoUpdateLastNotified =
+    await sql`-- do update lastQfNotifiedAt timestamp
 UPDATE public.user
 SET extra = jsonb_set(COALESCE(extra, '{}'::jsonb), '{lastQfNotifiedAt}', ${new Date().toISOString()} ::jsonb )
 WHERE user_name = ANY (${items.map(({ userName }) => userName)})

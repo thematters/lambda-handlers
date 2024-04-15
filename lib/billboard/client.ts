@@ -70,8 +70,10 @@ export async function getETHMainetNFTs(owner: string) {
 
 export const AddressMattersTravLoggerContract =
   '0x8515ba8EF2CF2F2BA44b26fF20337D7A2bc5e6D8'
-export const AddressENSDomainContract =
-  '0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85'
+export const AddressENSDomainContracts = new Set([
+  '0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85', // ERC721 ; ENS: Ethereum Name Service
+  '0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401', // ERC1155; ENS NameWrapper; ENS: Ethereum Name Service
+])
 
 export const MattersCurationEvent = parseAbiItem(
   'event Curation(address indexed from, address indexed to, address indexed token, string uri, uint256 amount)'
