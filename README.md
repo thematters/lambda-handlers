@@ -28,7 +28,7 @@ use docker image for lambda, instead of zip packages:
 ### Setup
 
 - Pull submodule:  `git submodule update --init`
-- Install deps: `npm install .`
+- Install deps: `npm install . && npm run prepare`
 
 
 ### Format & Lint & Test
