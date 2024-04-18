@@ -1,4 +1,4 @@
-import { ExchangeRate } from "../exchange-rate";
+import { ExchangeRate } from '../exchange-rate'
 
 // stub data
 
@@ -15,11 +15,11 @@ const coingeckoAPIData = {
     usd: 0.999504,
     last_updated_at: 1668738623,
   },
-};
+}
 
 const exchangeRatesDataAPIData = {
-  base: "HKD",
-  date: "2022-11-18",
+  base: 'HKD',
+  date: '2022-11-18',
   rates: {
     HKD: 1,
     TWD: 3.982979,
@@ -27,20 +27,20 @@ const exchangeRatesDataAPIData = {
   },
   success: true,
   timestamp: 1668752883,
-};
+}
 
-const exchangeRate = new ExchangeRate();
+const exchangeRate = new ExchangeRate()
 jest
-  .spyOn(exchangeRate as any, "requestCoingeckoAPI")
-  .mockResolvedValue(Promise.resolve(coingeckoAPIData));
+  .spyOn(exchangeRate as any, 'requestCoingeckoAPI')
+  .mockResolvedValue(Promise.resolve(coingeckoAPIData))
 jest
-  .spyOn(exchangeRate as any, "requestExchangeRatesDataAPI")
-  .mockResolvedValue(Promise.resolve(exchangeRatesDataAPIData));
+  .spyOn(exchangeRate as any, 'requestExchangeRatesDataAPI')
+  .mockResolvedValue(Promise.resolve(exchangeRatesDataAPIData))
 
-test("update token rates", async () => {
-  await exchangeRate.updateTokenRates();
-});
+test('update token rates', async () => {
+  await exchangeRate.updateTokenRates()
+})
 
-test("update fiat rates", async () => {
-  await exchangeRate.updateFiatRates();
-});
+test('update fiat rates', async () => {
+  await exchangeRate.updateFiatRates()
+})

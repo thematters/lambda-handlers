@@ -1,5 +1,5 @@
-import { handler } from "../daily-summary-email";
+import { handler } from '../daily-summary-email'
 
-test("run handler", async () => {
-  await handler({});
-});
+test('run handler', async () => {
+  await handler({})
+})

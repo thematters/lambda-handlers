@@ -1,63 +1,63 @@
-import { sql } from "../db.js";
-import { markUserState } from "./utils.js";
+import { sql } from '../db.js'
+import { markUserState } from './utils.js'
 
 export const processUserRetention = async ({
   intervalInDays,
   sendmail,
 }: {
-  intervalInDays: number;
-  sendmail: any;
+  intervalInDays: number
+  sendmail: any
 }) => {
-  await markNewUsers();
-  await markActiveUsers();
+  await markNewUsers()
+  await markActiveUsers()
 
   // fetch needed users data to check and change retention state
-  console.time("fetchUsersData");
-  const users = await fetchUsersData();
-  console.timeEnd("fetchUsersData");
-  console.log(`users num: ${users.length}`);
+  console.time('fetchUsersData')
+  const users = await fetchUsersData()
+  console.timeEnd('fetchUsersData')
+  console.log(`users num: ${users.length}`)
 
-  const now = new Date();
-  const intervalInMs = intervalInDays * 86400000;
-  console.log({ intervalInMs });
+  const now = new Date()
+  const intervalInMs = intervalInDays * 86400000
+  console.log({ intervalInMs })
 
-  console.time("loop");
+  console.time('loop')
   for (const { userId, state, stateUpdatedAt, lastSeen } of users) {
-    const stateDuration = +now - +stateUpdatedAt;
+    const stateDuration = +now - +stateUpdatedAt
     if (lastSeen > stateUpdatedAt) {
-      await markUserState(userId, "NORMAL");
+      await markUserState(userId, 'NORMAL')
     } else if (stateDuration > intervalInMs) {
       switch (state) {
-        case "NEWUSER":
-          await sendmail(userId, lastSeen, "NEWUSER");
-          break;
-        case "ACTIVE":
-          await sendmail(userId, lastSeen, "ACTIVE");
-          break;
-        case "ALERT":
-          await markUserState(userId, "INACTIVE");
-          break;
+        case 'NEWUSER':
+          await sendmail(userId, lastSeen, 'NEWUSER')
+          break
+        case 'ACTIVE':
+          await sendmail(userId, lastSeen, 'ACTIVE')
+          break
+        case 'ALERT':
+          await markUserState(userId, 'INACTIVE')
+          break
       }
     }
     // else stateDuration < intervalInMs , do nothing
   }
-  console.timeEnd("loop");
-};
+  console.timeEnd('loop')
+}
 
 const markNewUsers = async () => {
-  console.time("markNewUsers");
+  console.time('markNewUsers')
   await sql`
     INSERT INTO user_retention_history (user_id, state) 
     SELECT id, 'NEWUSER' FROM public.user 
     WHERE 
       created_at >= (CURRENT_TIMESTAMP - '2 day'::interval)
-      AND id NOT IN (SELECT user_id FROM user_retention_history);`;
-  console.timeEnd("markNewUsers");
-};
+      AND id NOT IN (SELECT user_id FROM user_retention_history);`
+  console.timeEnd('markNewUsers')
+}
 
 const markActiveUsers = async () => {
   // active users from exsited users
-  console.time("markActiveUsers1");
+  console.time('markActiveUsers1')
   await sql`
     INSERT INTO user_retention_history (user_id, state)
     -- users read 0.1+ hours last 2 mouth
@@ -74,11 +74,11 @@ const markActiveUsers = async () => {
       HAVING count(id) >= 1
     -- except marked users
     EXCEPT SELECT user_id, 'ACTIVE' 
-      FROM user_retention_history;`;
-  console.timeEnd("markActiveUsers1");
+      FROM user_retention_history;`
+  console.timeEnd('markActiveUsers1')
 
   // active users from NORMAL, INACTIVE pool
-  console.time("markActiveUsers2");
+  console.time('markActiveUsers2')
   await sql`
     -- helper table contains: users whose latest retention state are NORMAL / INACTIVE 
     WITH user_retention AS (
@@ -107,9 +107,9 @@ const markActiveUsers = async () => {
           AND article.created_at >= user_retention.created_at
         GROUP BY article.author_id
         HAVING count(article.id) >= 1
-    );`;
-  console.timeEnd("markActiveUsers2");
-};
+    );`
+  console.timeEnd('markActiveUsers2')
+}
 
 const fetchUsersData = async () => {
   return await sql`
@@ -126,7 +126,7 @@ const fetchUsersData = async () => {
       user_retention.created_at as state_updated_at,
       last_seen
     FROM user_retention, public.user
-    WHERE user_retention.user_id = public.user.id;`;
-};
+    WHERE user_retention.user_id = public.user.id;`
+}
 
 //processUserRetention({intervalInDays: 0}).then(()=>{process.exit()})

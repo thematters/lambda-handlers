@@ -1,23 +1,23 @@
-import cheerio from "cheerio";
+import cheerio from 'cheerio'
 // import { PostgresError } from "postgres";
-import postgres from "postgres";
+import postgres from 'postgres'
 
-import { dbApi, sql, sqlSIW } from "../lib/db.js";
+import { dbApi, sql, sqlSIW } from '../lib/db.js'
 // import { pgKnex } from "../lib/db.js";
 
-import createDebug from "debug";
+import createDebug from 'debug'
 
-const debugLog = createDebug("search-index-user-tag");
+const debugLog = createDebug('search-index-user-tag')
 
 // import OpenCC from "opencc";
-import * as opencc from "opencc";
-const OpenCC = (opencc as any).default;
+import * as opencc from 'opencc'
+const OpenCC = (opencc as any).default
 // console.log("imported opencc:", opencc, OpenCC);
-const converter = new OpenCC("t2s.json");
+const converter = new OpenCC('t2s.json')
 
-const ARRAY_TYPE = 1009;
+const ARRAY_TYPE = 1009
 
-const BATCH_SIZE = Number.parseInt(process.env.BATCH_SIZE || "", 10) || 100;
+const BATCH_SIZE = Number.parseInt(process.env.BATCH_SIZE || '', 10) || 100
 
 /**
  * A typeguarded version of `instanceof Error` for NodeJS.
@@ -28,32 +28,32 @@ export function instanceOfNodeError<T extends new (...args: any) => Error>(
   value: Error,
   errorType: T
 ): value is InstanceType<T> & NodeJS.ErrnoException {
-  return value instanceof errorType;
+  return value instanceof errorType
 }
 
 // searchKey is a sample search key
 export async function refreshSearchIndexUser({
-  searchKey = "user",
+  searchKey = 'user',
   migrate = false,
   checkLastBatchSize = 1000,
   checkLastBatchOffset = 0,
-  range = "1 month",
+  range = '1 month',
 } = {}) {
   // const [{ version, now }] = await sql` SELECT VERSION(), NOW() `; console.log("pgres:", { version, now });
 
-  let retries = 0;
+  let retries = 0
   const migrateFunc = async () => {
-    await sql.file("./sql/create-table-search-index-user.sql");
-    retries++;
-  };
-  if (migrate) await migrateFunc();
+    await sql.file('./sql/create-table-search-index-user.sql')
+    retries++
+  }
+  if (migrate) await migrateFunc()
 
   do {
     try {
       {
-        const started = Date.now();
+        const started = Date.now()
 
-        let processed = 0;
+        let processed = 0
         for await (const rows of dbApi
           .listRecentUsers({
             take: checkLastBatchSize,
@@ -63,19 +63,19 @@ export async function refreshSearchIndexUser({
           .cursor(BATCH_SIZE)) {
           await Promise.all(
             rows.map(async (row) => {
-              row.userName = row.userName.toLowerCase();
+              row.userName = row.userName.toLowerCase()
               if (row.displayName) {
-                row.displayNameOrig = row.displayName;
-                [row.displayName, row.description] = await Promise.all([
+                row.displayNameOrig = row.displayName
+                ;[row.displayName, row.description] = await Promise.all([
                   converter.convertPromise(row.displayName.toLowerCase()),
                   row.description &&
                     converter.convertPromise(row.description.toLowerCase()),
-                ]);
+                ])
               }
             })
-          );
+          )
 
-          console.log(new Date(), `prepared ${rows.length} items:`, rows);
+          console.log(new Date(), `prepared ${rows.length} items:`, rows)
           const res = await sqlSIW`-- upsert new users
 INSERT INTO search_index.user(id, user_name, display_name, display_name_orig, description, state, created_at, num_followers, last_followed_at) -- $ {sql(rows)}
   SELECT * FROM UNNEST(
@@ -128,81 +128,81 @@ DO UPDATE
     , last_followed_at = EXCLUDED.last_followed_at
     , indexed_at = CURRENT_TIMESTAMP
 
-RETURNING * ;`;
-          processed += res.length;
+RETURNING * ;`
+          processed += res.length
           debugLog(
             new Date(),
             `inserted (or updated) ${res.length} (of ${processed}) items:`,
             res.map(({ id, userName }) => `/@${userName}, ${id}`) // .rows
-          );
+          )
         }
-        const ended = new Date();
+        const ended = new Date()
         const [{ count }] =
-          await sql` SELECT COUNT(*) ::int FROM search_index.user ;`;
+          await sql` SELECT COUNT(*) ::int FROM search_index.user ;`
         console.log(
           new Date(),
           `refreshed search_index.user in ${
             +ended - started
           }ms, for ${count} users`
-        );
+        )
       }
       {
         // const searchKey = "用戶名";
-        const started = Date.now();
+        const started = Date.now()
         const res = await sqlSIW`-- sample search
 SELECT * FROM search_index.user
 WHERE display_name ~* ${searchKey} OR user_name ~* ${searchKey} OR plainto_tsquery('chinese_zh', ${searchKey}) @@ display_name_ts
 ORDER BY (display_name = ${searchKey} OR user_name = ${searchKey}) DESC,
   num_followers DESC NULLS LAST, id ASC
-LIMIT 100 ;`;
-        const ended = new Date();
+LIMIT 100 ;`
+        const ended = new Date()
         console.log(
           ended,
           `search (in ${+ended - started}ms) user got ${res.length} results:`,
           res
-        );
+        )
       }
-      break; // if succedeed
+      break // if succedeed
     } catch (err: any) {
       if (instanceOfNodeError(err, postgres.PostgresError)) {
         // 42P01	undefined_table; from https://www.postgresql.org/docs/current/errcodes-appendix.html
-        if (err.code === "42P01") {
-          await migrateFunc();
+        if (err.code === '42P01') {
+          await migrateFunc()
         }
       }
 
       console.error(
         new Date(),
-        "refresh ERROR:",
+        'refresh ERROR:',
         // typeof err,
         err.code,
         // Object.entries(err),
         err
-      );
-      break;
+      )
+      break
     }
-  } while (retries <= 1);
+  } while (retries <= 1)
 }
 
 // searchKey is a sample search key
 export async function refreshSearchIndexTag({
-  searchKey = "tag",
+  searchKey = 'tag',
   migrate = false,
   checkLastBatchSize = 1000,
   checkLastBatchOffset = 0,
-  range = "1 month",
+  range = '1 month',
 } = {}) {
-  let retries = 0;
+  let retries = 0
   const migrateFunc = async () => {
-    await sql.file("./sql/create-table-search-index-tag.sql");
-    retries++;
-  };
-  if (migrate) await migrateFunc();
+    await sql.file('./sql/create-table-search-index-tag.sql')
+    retries++
+  }
+  if (migrate) await migrateFunc()
 
   do {
     try {
       {
-        const started = Date.now();
+        const started = Date.now()
 
         for await (const rows of dbApi
           .listRecentTags({
@@ -213,14 +213,14 @@ export async function refreshSearchIndexTag({
           .cursor(BATCH_SIZE)) {
           await Promise.all(
             rows.map(async (row) => {
-              row.contentOrig = row.content;
-              [row.content, row.description] = await Promise.all([
+              row.contentOrig = row.content
+              ;[row.content, row.description] = await Promise.all([
                 converter.convertPromise(row.content.toLowerCase()),
                 row.description &&
                   converter.convertPromise(row.description.toLowerCase()),
-              ]);
+              ])
             })
-          );
+          )
 
           const res = await sqlSIW`-- insert new tags, or update
 INSERT INTO search_index.tag(id, content, content_orig, description, created_at, num_articles, num_authors, num_followers, last_followed_at)
@@ -274,104 +274,104 @@ DO UPDATE SET
   last_followed_at = EXCLUDED.last_followed_at,
   indexed_at = CURRENT_TIMESTAMP
 
-RETURNING * ; `;
+RETURNING * ; `
 
           debugLog(
             new Date(),
             `inserted (or updated) ${res.length} items:`,
             // res // .rows
             res.map(({ id, contentOrig }) => `/${id}-${contentOrig}`) // .rows
-          );
+          )
         }
 
-        const ended = new Date();
+        const ended = new Date()
         const [{ count }] =
-          await sql` SELECT COUNT(*) ::int FROM search_index.tag ;`;
+          await sql` SELECT COUNT(*) ::int FROM search_index.tag ;`
         console.log(
           new Date(),
           `refreshed search_index.tag in ${
             +ended - started
           }ms, for ${count} tags`
-        );
+        )
       }
 
       {
-        const started = Date.now();
+        const started = Date.now()
         const res = await sqlSIW`-- sample search
 SELECT * FROM search_index.tag, plainto_tsquery('chinese_zh', ${searchKey}) query
 WHERE content ~* ${searchKey} OR content_ts @@ query
 ORDER BY (content = ${searchKey}) DESC,
   num_articles DESC NULLS LAST, id ASC
-LIMIT 100 ;`;
-        const ended = new Date();
+LIMIT 100 ;`
+        const ended = new Date()
         console.log(
           ended,
           `search (in ${+ended - started}ms) tag got ${res.length} results:`,
           res
-        );
+        )
       }
-      break; // if succedeed
+      break // if succedeed
     } catch (err: any) {
       if (instanceOfNodeError(err, postgres.PostgresError)) {
         // 42P01	undefined_table; from https://www.postgresql.org/docs/current/errcodes-appendix.html
-        if (err.code === "42P01") {
-          await migrateFunc();
+        if (err.code === '42P01') {
+          await migrateFunc()
         }
       }
 
       console.error(
         new Date(),
-        "refresh ERROR:",
+        'refresh ERROR:',
         // typeof err,
         err.code,
         // Object.entries(err),
         err
-      );
-      break;
+      )
+      break
     }
-  } while (retries <= 1);
+  } while (retries <= 1)
 }
 
 // searchKey is a sample search key
 export async function refreshSearchIndexArticle({
-  searchKey = "tag",
+  searchKey = 'tag',
   migrate = false,
   checkLastBatchSize = 1000,
   checkLastBatchOffset = 0,
-  range = "1 month",
+  range = '1 month',
 } = {}) {
   for await (const articles of dbApi
     .listArticles({
       take: checkLastBatchSize,
       skip: checkLastBatchOffset,
       range,
-      orderBy: "seqDesc",
+      orderBy: 'seqDesc',
     })
     .cursor(BATCH_SIZE)) {
-    console.log(`got ${articles.length} rows:`);
+    console.log(`got ${articles.length} rows:`)
     await Promise.allSettled(
       articles.map(async (arti, idx) => {
-        if (arti.state !== "active") return; // ignore archived, leave text to null reset
+        if (arti.state !== 'active') return // ignore archived, leave text to null reset
 
-        const $ = cheerio.load(arti.content!);
-        const text = $("body")
-          .children("*")
+        const $ = cheerio.load(arti.content!)
+        const text = $('body')
+          .children('*')
           .toArray()
           .map((e) => $(e).text().trim())
           .filter(Boolean)
-          .join("\n"); // $.text();
+          .join('\n') // $.text();
         // arti.textContent = text;
-        arti.titleOrig = arti.title;
-        [arti.title, arti.summary, arti.textContentConverted] =
+        arti.titleOrig = arti.title
+        ;[arti.title, arti.summary, arti.textContentConverted] =
           await Promise.all([
             converter.convertPromise(arti.title.toLowerCase()),
             converter.convertPromise(arti.summary.toLowerCase()),
             converter.convertPromise(text.toLowerCase()),
-          ]);
-        delete arti.content;
-        debugLog(`article${idx}:`, arti);
+          ])
+        delete arti.content
+        debugLog(`article${idx}:`, arti)
       })
-    );
+    )
 
     const res = await sqlSIW`-- upsert refresh on target DB search_index.article
 INSERT INTO search_index.article(id, title, author_id, summary, text_content_converted, num_views, state, author_state, created_at, last_read_at)
@@ -434,12 +434,12 @@ DO UPDATE
     , last_read_at = EXCLUDED.last_read_at
     , indexed_at = CURRENT_TIMESTAMP
 
-RETURNING * ;`;
+RETURNING * ;`
     debugLog(
       new Date(),
       `inserted (or updated) ${res.length} items:`,
       res[0]
       // res.map(({ id, userName }) => `/@${userName}-${id}`) // .rows
-    );
+    )
   }
 }

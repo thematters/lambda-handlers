@@ -1,58 +1,58 @@
-import { BetaAnalyticsDataClient } from "@google-analytics/data";
+import { BetaAnalyticsDataClient } from '@google-analytics/data'
 
-import { pgKnexRO as knexRO, pgKnex as knex } from "./db.js";
+import { pgKnexRO as knexRO, pgKnex as knex } from './db.js'
 
-const propertyId = process.env.MATTERS_GA4_PROPERTY_ID;
-const projectId = process.env.MATTERS_GA4_PROJECT_ID;
-const clientEmail = process.env.MATTERS_GA4_CLIENT_EMAIL;
-const privateKey = process.env.MATTERS_GA4_PRIVATE_KEY || "";
+const propertyId = process.env.MATTERS_GA4_PROPERTY_ID
+const projectId = process.env.MATTERS_GA4_PROJECT_ID
+const clientEmail = process.env.MATTERS_GA4_CLIENT_EMAIL
+const privateKey = process.env.MATTERS_GA4_PRIVATE_KEY || ''
 
-export const TABLE_NAME = "article_ga4_data";
+export const TABLE_NAME = 'article_ga4_data'
 
 interface Row {
-  path: string;
-  totalUsers: string;
+  path: string
+  totalUsers: string
 }
 
 interface MergedData {
-  [key: string]: number;
+  [key: string]: number
 }
 
 export const getLocalDateString = (date: Date) => {
   // return utc+8 date string in YYYY-MM-DD format
-  return date.toLocaleDateString("sv", { timeZone: "Asia/Taipei" });
-};
+  return date.toLocaleDateString('sv', { timeZone: 'Asia/Taipei' })
+}
 
 export const fetchGA4Data = async ({
   startDate,
   endDate,
 }: {
-  startDate: string;
-  endDate: string;
+  startDate: string
+  endDate: string
 }): Promise<Row[]> => {
   const analyticsDataClient = new BetaAnalyticsDataClient({
     projectId,
     credentials: {
       client_email: clientEmail,
-      private_key: privateKey.replace(/\\n/g, "\n"),
+      private_key: privateKey.replace(/\\n/g, '\n'),
     },
-  });
-  const limit = 10000;
-  let offset = 0;
-  const result: Row[] = [];
+  })
+  const limit = 10000
+  let offset = 0
+  const result: Row[] = []
   for (;;) {
     const res = await request(
       { startDate, endDate, limit, offset },
       analyticsDataClient
-    );
-    result.push(...res);
-    offset += limit;
+    )
+    result.push(...res)
+    offset += limit
     if (res.length < limit) {
-      break;
+      break
     }
   }
-  return result;
-};
+  return result
+}
 
 export const saveGA4Data = async (
   data: MergedData,
@@ -62,32 +62,32 @@ export const saveGA4Data = async (
     articleId: id,
     totalUsers,
     dateRange: `[${startDate}, ${endDate}]`,
-  }));
-  const updateRows = [];
-  const insertRows = [];
+  }))
+  const updateRows = []
+  const insertRows = []
   for (const { articleId, dateRange, totalUsers } of rows) {
     const res = await knexRO(TABLE_NAME)
       .where({ articleId, dateRange })
-      .select("id", "totalUsers")
-      .first();
+      .select('id', 'totalUsers')
+      .first()
     if (res && res.totalUsers) {
       if (res.totalUsers !== String(totalUsers)) {
         // only update when totalUsers is different
-        updateRows.push({ id: res.id, totalUsers });
+        updateRows.push({ id: res.id, totalUsers })
       }
     } else {
-      insertRows.push({ articleId, dateRange, totalUsers });
+      insertRows.push({ articleId, dateRange, totalUsers })
     }
   }
   if (updateRows.length > 0) {
     for (const { id, totalUsers } of updateRows) {
-      await knex(TABLE_NAME).update({ totalUsers }).where({ id: id });
+      await knex(TABLE_NAME).update({ totalUsers }).where({ id: id })
     }
   }
   if (insertRows.length > 0) {
-    await knex(TABLE_NAME).insert(insertRows);
+    await knex(TABLE_NAME).insert(insertRows)
   }
-};
+}
 
 export const convertAndMerge = async (rows: Row[]): Promise<MergedData> => {
   const converted = Promise.all(
@@ -95,48 +95,48 @@ export const convertAndMerge = async (rows: Row[]): Promise<MergedData> => {
       id: await pathToId(row.path),
       totalUsers: parseInt(row.totalUsers, 10),
     }))
-  );
-  const res: MergedData = {};
-  const ret = await knexRO("article").max("id").first();
-  const maxLegalId = ret ? parseInt(ret.max) : 0;
+  )
+  const res: MergedData = {}
+  const ret = await knexRO('article').max('id').first()
+  const maxLegalId = ret ? parseInt(ret.max) : 0
   for (const row of await converted) {
     if (row.id in res) {
-      res[row.id] += row.totalUsers;
+      res[row.id] += row.totalUsers
     } else {
       if (row.id && parseInt(row.id) <= maxLegalId) {
-        res[row.id] = row.totalUsers;
+        res[row.id] = row.totalUsers
       }
     }
   }
-  return res;
-};
+  return res
+}
 
 const pathToId = async (path: string) => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_, __, articlePath] = path.split("/");
+  const [_, __, articlePath] = path.split('/')
   if (articlePath) {
-    const parts = articlePath.split("-");
-    const idLike = parts[0];
-    const hash = parts[parts.length - 1];
+    const parts = articlePath.split('-')
+    const idLike = parts[0]
+    const hash = parts[parts.length - 1]
     if (/^-?\d+$/.test(idLike)) {
-      return idLike;
+      return idLike
     } else {
-      return hashToId(hash);
+      return hashToId(hash)
     }
   }
-};
+}
 
 const hashToId = async (hash: string) => {
-  const res = await knexRO("draft")
+  const res = await knexRO('draft')
     .where({ mediaHash: hash })
-    .select("article_id")
-    .first();
+    .select('article_id')
+    .first()
   if (res) {
-    return res.articleId;
+    return res.articleId
   } else {
-    return null;
+    return null
   }
-};
+}
 
 // https://developers.google.com/analytics/devguides/reporting/data/v1
 const request = async (
@@ -146,10 +146,10 @@ const request = async (
     limit,
     offset,
   }: {
-    startDate: string;
-    endDate: string;
-    limit: number;
-    offset: number;
+    startDate: string
+    endDate: string
+    limit: number
+    offset: number
   },
   client: BetaAnalyticsDataClient
 ): Promise<Row[]> => {
@@ -163,36 +163,36 @@ const request = async (
     ],
     dimensions: [
       {
-        name: "pagePath",
+        name: 'pagePath',
       },
     ],
     dimensionFilter: {
       filter: {
-        fieldName: "pagePath",
+        fieldName: 'pagePath',
         stringFilter: {
-          matchType: "BEGINS_WITH",
-          value: "/@",
+          matchType: 'BEGINS_WITH',
+          value: '/@',
         },
       },
     },
     metrics: [
       {
-        name: "totalUsers",
+        name: 'totalUsers',
         //name: 'activeUsers',
       },
     ],
     limit,
     offset,
     returnPropertyQuota: true,
-  });
+  })
   if (response && response.rows) {
-    console.log(response.propertyQuota);
-    console.log(`total rows count: ${response.rowCount}`);
+    console.log(response.propertyQuota)
+    console.log(`total rows count: ${response.rowCount}`)
     return response.rows.map((row) => ({
-      path: (row.dimensionValues && row.dimensionValues[0].value) ?? "",
-      totalUsers: (row.metricValues && row.metricValues[0].value) ?? "0",
-    }));
+      path: (row.dimensionValues && row.dimensionValues[0].value) ?? '',
+      totalUsers: (row.metricValues && row.metricValues[0].value) ?? '0',
+    }))
   } else {
-    throw new Error("No response received.");
+    throw new Error('No response received.')
   }
-};
+}
