@@ -1,5 +1,5 @@
-import { generateKeyPair } from "node:crypto";
-import { promisify } from "node:util";
+import { generateKeyPair } from 'node:crypto'
+import { promisify } from 'node:util'
 
 import {
   // HomepageArticleDigest,
@@ -9,30 +9,30 @@ import {
   makeHomepage,
   makeHomepageBundles,
   makeActivityPubBundles,
-} from "@matters/ipns-site-generator";
-import slugify from "@matters/slugify";
+} from '@matters/ipns-site-generator'
+import slugify from '@matters/slugify'
 
-import { ipfsPool } from "../lib/ipfs-servers.js";
-import { dbApi, Item } from "../lib/db.js";
+import { ipfsPool } from '../lib/ipfs-servers.js'
+import { dbApi, Item } from '../lib/db.js'
 
-const generateKeyPairPromisified = promisify(generateKeyPair);
+const generateKeyPairPromisified = promisify(generateKeyPair)
 
 export const ARTICLE_ACCESS_TYPE = {
-  public: "public",
-  paywall: "paywall",
-} as const;
+  public: 'public',
+  paywall: 'paywall',
+} as const
 
-const siteDomain = process.env.MATTERS_SITE_DOMAIN || "matters.town";
+const siteDomain = process.env.MATTERS_SITE_DOMAIN || 'matters.town'
 
 export class AuthorFeed {
-  author: Item;
-  ipnsKey: string; // the ipns key
+  author: Item
+  ipnsKey: string // the ipns key
 
   // internal use
-  publishedDrafts: Item[];
-  userImg?: string | null;
-  articles?: Map<string, Item>;
-  webfHost?: string;
+  publishedDrafts: Item[]
+  userImg?: string | null
+  articles?: Map<string, Item>
+  webfHost?: string
 
   // articleService: InstanceType<typeof ArticleService>
   // draftService: InstanceType<typeof DraftService>
@@ -46,37 +46,37 @@ export class AuthorFeed {
     drafts,
     articles,
   }: {
-    author: Item;
-    ipnsKey: string;
-    webfHost?: string;
-    drafts: Item[];
-    articles?: Item[];
+    author: Item
+    ipnsKey: string
+    webfHost?: string
+    drafts: Item[]
+    articles?: Item[]
   }) {
-    this.author = author;
-    this.ipnsKey = ipnsKey;
-    this.webfHost = webfHost || `${this.ipnsKey}.ipns.cf-ipfs.com`;
+    this.author = author
+    this.ipnsKey = ipnsKey
+    this.webfHost = webfHost || `${this.ipnsKey}.ipns.cf-ipfs.com`
 
     // this.articleService = new ArticleService()
     // this.draftService = new DraftService()
     // this.systemService = new SystemService()
 
-    this.publishedDrafts = drafts;
+    this.publishedDrafts = drafts
     if (articles) {
-      this.articles = new Map(articles.map((arti) => [arti.id, arti]));
+      this.articles = new Map(articles.map((arti) => [arti.id, arti]))
     }
   }
 
   async loadData() {
     this.userImg = await dbApi.findAssetUrl(
       this.author.avatar,
-      "w=240,h=240,fit=crop,anim=false"
-    ); // this.author.avatar || null; // && (await this.systemService.findAssetUrl(this.author.avatar))
-    console.log(new Date(), "loadData got userImg:", this.userImg);
+      'w=240,h=240,fit=crop,anim=false'
+    ) // this.author.avatar || null; // && (await this.systemService.findAssetUrl(this.author.avatar))
+    console.log(new Date(), 'loadData got userImg:', this.userImg)
   }
 
   // mov from articleService.ts
   generate() {
-    const { userName, displayName, description } = this.author;
+    const { userName, displayName, description } = this.author
 
     const context = {
       meta: {
@@ -96,22 +96,22 @@ export class AuthorFeed {
           webfDomain: this.webfHost,
         },
         website: {
-          name: "Matters",
+          name: 'Matters',
           uri: `https://${siteDomain}`,
         },
       },
       rss: this.ipnsKey
         ? {
             // ipnsKey: this.ipnsKey,
-            xml: "./rss.xml",
-            json: "./feed.json",
+            xml: './rss.xml',
+            json: './feed.json',
           }
         : undefined,
       articles: this.publishedDrafts
         // .sort((a, b) => +b.articleId - +a.articleId)
         .map((draft) => {
-          const arti = this.articles?.get(draft.articleId);
-          if (!arti) return;
+          const arti = this.articles?.get(draft.articleId)
+          if (!arti) return
 
           return {
             id: draft.articleId ?? arti.id,
@@ -131,12 +131,12 @@ export class AuthorFeed {
             sourceUri: `https://${siteDomain}/@${userName}/${
               draft.articleId ?? arti.id
             }-${arti.slug ?? slugify(arti.title)}/`,
-          };
+          }
         })
         .filter(Boolean) as any[],
-    } as HomepageContext;
+    } as HomepageContext
 
-    return makeHomepage(context);
+    return makeHomepage(context)
   }
 
   // dup from articleService.ts
@@ -153,14 +153,14 @@ export class AuthorFeed {
       authorId,
       articleId,
       updatedAt: publishedAt,
-    } = draft;
+    } = draft
 
     const {
       userName,
       displayName,
       description, // paymentPointer
-    } = this.author;
-    const articleCoverImg = await dbApi.findAssetUrl(cover);
+    } = this.author
+    const articleCoverImg = await dbApi.findAssetUrl(cover)
 
     const context: ArticlePageContext = {
       encrypted: false,
@@ -182,15 +182,15 @@ export class AuthorFeed {
           webfDomain: this.webfHost,
         },
         website: {
-          name: "Matters",
+          name: 'Matters',
           uri: `https://${siteDomain}`,
         },
       },
       rss: this.ipnsKey
         ? {
             // ipnsKey: this.ipnsKey,
-            xml: "../rss.xml",
-            json: "../feed.json",
+            xml: '../rss.xml',
+            json: '../feed.json',
           }
         : undefined,
       article: {
@@ -205,32 +205,32 @@ export class AuthorFeed {
         content,
         tags: tags?.map((t: string) => t.trim()).filter(Boolean) || [],
       },
-    };
+    }
 
     // paywalled content
     if (circleId && access === ARTICLE_ACCESS_TYPE.paywall) {
-      context.encrypted = true;
+      context.encrypted = true
       console.error(
         new Date(),
         `TODO: support ARTICLE_ACCESS_TYPE.paywall`,
         draft
-      );
-      return;
+      )
+      return
     }
 
     // payment pointer
     // if (paymentPointer) { context.paymentPointer = paymentPointer }
 
     // make bundle and add content to ipfs
-    const directoryName = "article";
-    const { bundle, key } = await makeArticlePage(context);
+    const directoryName = 'article'
+    const { bundle, key } = await makeArticlePage(context)
 
-    let ipfs = ipfsPool.client;
-    let retries = 0;
+    let ipfs = ipfsPool.client
+    let retries = 0
 
     do {
       try {
-        const results = [];
+        const results = []
         for await (const result of ipfs.addAll(
           bundle
             .map((file) =>
@@ -240,41 +240,41 @@ export class AuthorFeed {
             )
             .filter(Boolean) as any
         )) {
-          results.push(result);
+          results.push(result)
         }
 
         // filter out the hash for the bundle
         let entry = results.filter(
           ({ path }: { path: string }) => path === directoryName
-        );
+        )
 
         // FIXME: fix missing bundle path and remove fallback logic
         // fallback to index file when no bundle path is matched
         if (entry.length === 0) {
           entry = results.filter(({ path }: { path: string }) =>
-            path.endsWith("index.html")
-          );
+            path.endsWith('index.html')
+          )
         }
 
-        const contentHash = entry[0].cid.toString();
-        const mediaHash = entry[0].cid.toV1().toString(); // cid.toV1().toString() // cid.toBaseEncodedString()
-        return { contentHash, mediaHash, key };
+        const contentHash = entry[0].cid.toString()
+        const mediaHash = entry[0].cid.toV1().toString() // cid.toV1().toString() // cid.toBaseEncodedString()
+        return { contentHash, mediaHash, key }
       } catch (err) {
         // if the active IPFS client throws exception, try a few more times on Secondary
         console.error(
           `publishToIPFS failed, retries ${++retries} time, ERROR:`,
           err
-        );
-        ipfs = ipfsPool.backupClient;
+        )
+        ipfs = ipfsPool.backupClient
       }
-    } while (ipfs && retries <= ipfsPool.size); // break the retry if there's no backup
+    } while (ipfs && retries <= ipfsPool.size) // break the retry if there's no backup
 
     // re-fill dataHash & mediaHash later in IPNS-listener
-    console.error(`failed publishToIPFS after ${retries} retries.`);
+    console.error(`failed publishToIPFS after ${retries} retries.`)
   }
 
   async feedBundles() {
-    const { userName, displayName, description } = this.author;
+    const { userName, displayName, description } = this.author
 
     const context = {
       meta: {
@@ -290,22 +290,22 @@ export class AuthorFeed {
           uri: `https://${siteDomain}/@${userName}`,
         },
         website: {
-          name: "Matters",
+          name: 'Matters',
           uri: `https://${siteDomain}`,
         },
       },
       rss: this.ipnsKey
         ? {
             // ipnsKey: this.ipnsKey,
-            xml: "./rss.xml",
-            json: "./feed.json",
+            xml: './rss.xml',
+            json: './feed.json',
           }
         : undefined,
       articles: this.publishedDrafts
         // .sort((a, b) => +b.articleId - +a.articleId)
         .map((draft) => {
-          const arti = this.articles?.get(draft.articleId);
-          if (!arti) return;
+          const arti = this.articles?.get(draft.articleId)
+          if (!arti) return
 
           return {
             id: draft.articleId ?? arti.id,
@@ -327,12 +327,12 @@ export class AuthorFeed {
             sourceUri: `https://${siteDomain}/@${userName}/${
               draft.articleId ?? arti.id
             }-${arti.slug ?? slugify(arti.title)}/`,
-          };
+          }
         })
         .filter(Boolean) as any[],
-    } as HomepageContext;
+    } as HomepageContext
 
-    return makeHomepageBundles(context);
+    return makeHomepageBundles(context)
     /* const { html, xml, json } = await makeHomepage(context);
     return [
       { path: "index.html", content: html },
@@ -344,39 +344,39 @@ export class AuthorFeed {
   async activityPubBundles() {
     // const k = await generateKeyPairPromisified("rsa", { modulusLength: 4096, publicKeyEncoding: { type: "spki", format: "pem" }, privateKeyEncoding: { type: "pkcs8", format: "pem" }, });
 
-    const actor = `https://${this.webfHost}/about.jsonld`;
-    const outboxItems = this.publishedDrafts; // .slice(0, 3); // test at most 3 entries
+    const actor = `https://${this.webfHost}/about.jsonld`
+    const outboxItems = this.publishedDrafts // .slice(0, 3); // test at most 3 entries
     // .sort((a, b) => +b.articleId - +a.articleId)
     const outboxContent = {
-      "@context": "https://www.w3.org/ns/activitystreams",
+      '@context': 'https://www.w3.org/ns/activitystreams',
       id: actor,
-      type: "OrderedCollection",
+      type: 'OrderedCollection',
       totalItems: outboxItems.length,
       orderedItems: outboxItems.map((draft) => {
-        const arti = this.articles?.get(draft.articleId);
-        if (!arti) return;
+        const arti = this.articles?.get(draft.articleId)
+        if (!arti) return
         const url = `https://${this.webfHost}/${draft.articleId ?? arti.id}-${
           arti.slug ?? slugify(arti.title)
-        }/`;
+        }/`
 
         return {
-          "@context": "https://www.w3.org/ns/activitystreams",
-          type: "Create",
+          '@context': 'https://www.w3.org/ns/activitystreams',
+          type: 'Create',
           actor,
           published: arti.createdAt,
-          to: ["https://www.w3.org/ns/activitystreams#Public"],
+          to: ['https://www.w3.org/ns/activitystreams#Public'],
           cc: [`https://${this.webfHost}/followers.jsonld`],
           object: {
-            "@context": "https://www.w3.org/ns/activitystreams",
+            '@context': 'https://www.w3.org/ns/activitystreams',
 
             id: url,
-            type: "Note",
+            type: 'Note',
             summary: arti.summary,
             published: arti.createdAt,
             content: `${arti.title}<br>${arti.summary}`,
             url,
             attributedTo: actor,
-            to: ["https://www.w3.org/ns/activitystreams#Public"],
+            to: ['https://www.w3.org/ns/activitystreams#Public'],
             cc: [],
             sensitive: false,
             atomUri: url,
@@ -387,9 +387,9 @@ export class AuthorFeed {
             tag: [],
             // "replies": "https://staticpub.mauve.moe/newpost-replies.jsonld"
           },
-        };
+        }
       }),
-    };
+    }
 
     // if (!webfHost) webfHost = `${this.ipnsKey}.ipns.cf-ipfs.com`;
 
@@ -410,13 +410,13 @@ export class AuthorFeed {
             ),
             links: [
               {
-                rel: "http://webfinger.net/rel/profile-page",
-                type: "text/html",
+                rel: 'http://webfinger.net/rel/profile-page',
+                type: 'text/html',
                 href: `https://${this.webfHost}`,
               },
               {
-                rel: "self",
-                type: "application/activity+json",
+                rel: 'self',
+                type: 'application/activity+json',
                 href: actor,
               },
             ],
@@ -426,23 +426,23 @@ export class AuthorFeed {
         ),
       },
       {
-        path: "about.jsonld",
+        path: 'about.jsonld',
         content: JSON.stringify(
           {
-            "@context": [
-              "https://www.w3.org/ns/activitystreams",
-              "https://w3id.org/security/v1",
+            '@context': [
+              'https://www.w3.org/ns/activitystreams',
+              'https://w3id.org/security/v1',
               {
                 // "@language": "en- US",
-                toot: "http://joinmastodon.org/ns#",
-                discoverable: "toot:discoverable",
+                toot: 'http://joinmastodon.org/ns#',
+                discoverable: 'toot:discoverable',
                 alsoKnownAs: {
-                  "@id": "as:alsoKnownAs",
-                  "@type": "@id",
+                  '@id': 'as:alsoKnownAs',
+                  '@type': '@id',
                 },
               },
             ],
-            type: "Person",
+            type: 'Person',
             id: actor,
             inbox: `https://${this.webfHost}/inbox.jsonld`, // TO accept POST
             outbox: `https://${this.webfHost}/outbox.jsonld`,
@@ -454,7 +454,7 @@ export class AuthorFeed {
             // "followers": "https://staticpub.mauve.moe/followers.jsonld",
             preferredUsername: this.author.userName,
             name: `${this.author.displayName}`.trim(),
-            summary: (this.author.description || "").trim(),
+            summary: (this.author.description || '').trim(),
             discoverable: true,
 
             icon: this.userImg
@@ -468,8 +468,8 @@ export class AuthorFeed {
                 ]
               : undefined,
             publicKey: {
-              "@context": "https://w3id.org/security/v1",
-              "@type": "Key",
+              '@context': 'https://w3id.org/security/v1',
+              '@type': 'Key',
               // "id": "https://paul.kinlan.me/paul#main-key",
               id: `https://${this.webfHost}/about.jsonld#main-key`,
               owner: actor,
@@ -490,9 +490,9 @@ export class AuthorFeed {
       },
 
       {
-        path: "outbox.jsonld",
+        path: 'outbox.jsonld',
         content: JSON.stringify(outboxContent, null, 2),
       },
-    ] as { path: string; content: string }[];
+    ] as { path: string; content: string }[]
   }
 }

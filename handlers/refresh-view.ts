@@ -1,4 +1,4 @@
-import { refreshView } from "../lib/refresh-view.js";
+import { refreshView } from '../lib/refresh-view.js'
 
 // envs
 // MATTERS_PG_HOST
@@ -10,9 +10,9 @@ import { refreshView } from "../lib/refresh-view.js";
 // see https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-transform-target-input.html for info.
 type RefreshViewEvent = {
   data: {
-    viewName: string;
-  };
-};
+    viewName: string
+  }
+}
 
 export const handler = async (event: RefreshViewEvent) =>
-  refreshView(event.data.viewName);
+  refreshView(event.data.viewName)

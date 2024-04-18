@@ -1,57 +1,57 @@
-import cheerio from "cheerio";
-import Debug from "debug";
-import pkg from "../package.json" assert { type: "json" };
+import cheerio from 'cheerio'
+import Debug from 'debug'
+import pkg from '../package.json' assert { type: 'json' }
 
-const debugLog = Debug("pg-zhparser-articles-indexer");
+const debugLog = Debug('pg-zhparser-articles-indexer')
 
-import * as opencc from "opencc";
-const OpenCC = (opencc as any).default;
-const converter = new OpenCC("t2s.json");
+import * as opencc from 'opencc'
+const OpenCC = (opencc as any).default
+const converter = new OpenCC('t2s.json')
 
-import { sqlSIW } from "../lib/db.js";
+import { sqlSIW } from '../lib/db.js'
 
 // https://www.atdatabases.org/docs/pg-bulk might be a better library on Bulk insert
 // otherwise, the library is inferring some wrong type 25 on the PostgreSQL wire protocol
-const ARRAY_TYPE = 1009;
+const ARRAY_TYPE = 1009
 
 export interface Article {
-  id: string;
-  articleId: string;
-  title: string;
-  titleOrig?: string;
-  authorId: string | number;
-  slug: string;
-  summary: string;
-  content?: string;
-  textContent?: string;
-  textContentConverted?: string;
-  createdAt: Date | string;
-  numViews?: number;
-  lastReadAt?: Date;
+  id: string
+  articleId: string
+  title: string
+  titleOrig?: string
+  authorId: string | number
+  slug: string
+  summary: string
+  content?: string
+  textContent?: string
+  textContentConverted?: string
+  createdAt: Date | string
+  numViews?: number
+  lastReadAt?: Date
 }
 
 export class ArticlesIndexer {
   async initIndexes() {
-    debugLog("init zhparser indexes:");
+    debugLog('init zhparser indexes:')
   }
 
   async addToSearch(articles: Article[]) {
     await Promise.allSettled(
       articles.map(async (arti, idx) => {
-        const $ = cheerio.load(arti.content!);
-        const text = $.text();
+        const $ = cheerio.load(arti.content!)
+        const text = $.text()
         // arti.textContent = text;
-        arti.titleOrig = arti.title;
-        [arti.title, arti.summary, arti.textContentConverted] =
+        arti.titleOrig = arti.title
+        ;[arti.title, arti.summary, arti.textContentConverted] =
           await Promise.all([
             converter.convertPromise(arti.title.toLowerCase()),
             converter.convertPromise(arti.summary.toLowerCase()),
             converter.convertPromise(text.toLowerCase()),
-          ]);
-        delete arti.content;
-        debugLog(`article${idx}:`, arti);
+          ])
+        delete arti.content
+        debugLog(`article${idx}:`, arti)
       })
-    );
+    )
 
     // -- $ {zhParserDBSQL.array( ["367103", "367102", "367101", "367100", "367099"], 1009)} ::int[],
     // -- ARRAY['朝环任务〉环岛分享开启=］', '穆斯林的女儿', 'rooit 聊天交友 app 完整教学与真实评价！', '波尔图hostel的住客', 'rise of elves - best nft play to earn crypto games in 2023'] ::text[]
@@ -105,13 +105,13 @@ DO UPDATE
     , created_at = EXCLUDED.created_at
     , indexed_at = CURRENT_TIMESTAMP
 
-RETURNING * ;`;
+RETURNING * ;`
     debugLog(
       new Date(),
       `inserted (or updated) ${res.length} items:`
       // res.map(({ id, userName }) => `/@${userName}-${id}`) // .rows
-    );
+    )
   }
 }
 
-export const articlesIndexer = new ArticlesIndexer();
+export const articlesIndexer = new ArticlesIndexer()

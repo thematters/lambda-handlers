@@ -1,21 +1,21 @@
-import { DB_NOTICE_TYPE } from "./enum.js";
-import type { DBNoticeType } from "./notice";
-import { Notice } from "./notice.js";
-import { sendmail } from "./sendmail.js";
+import { DB_NOTICE_TYPE } from './enum.js'
+import type { DBNoticeType } from './notice'
+import { Notice } from './notice.js'
+import { sendmail } from './sendmail.js'
 
 export const sendDailySummaryEmails = async () => {
-  const notice = new Notice();
-  const users = await notice.findDailySummaryUsers();
+  const notice = new Notice()
+  const users = await notice.findDailySummaryUsers()
 
   const jobs = users.map(async (user, index) => {
-    const notices = await notice.findDailySummaryNoticesByUser(user.id);
+    const notices = await notice.findDailySummaryNoticesByUser(user.id)
 
     if (!notices || notices.length <= 0) {
-      return;
+      return
     }
 
     const filterNotices = (type: DBNoticeType) =>
-      notices.filter((notice) => notice.noticeType === type);
+      notices.filter((notice) => notice.noticeType === type)
 
     await sendmail({
       to: user.email,
@@ -63,7 +63,7 @@ export const sendDailySummaryEmails = async () => {
         ),
       },
       language: user.language,
-    });
-  });
-  await Promise.all(jobs);
-};
+    })
+  })
+  await Promise.all(jobs)
+}

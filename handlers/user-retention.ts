@@ -1,6 +1,6 @@
-import type { SendmailFn } from "../lib/user-retention/types";
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { processUserRetention } from "../lib/user-retention/index.js";
+import type { SendmailFn } from '../lib/user-retention/types'
+import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs'
+import { processUserRetention } from '../lib/user-retention/index.js'
 
 // envs
 // MATTERS_USER_RETENTION_INTERVAL_IN_DAYS
@@ -12,12 +12,11 @@ import { processUserRetention } from "../lib/user-retention/index.js";
 // MATTERS_PG_RO_CONNECTION_STRING
 
 const intervalInDays =
-  parseFloat(process.env.MATTERS_USER_RETENTION_INTERVAL_IN_DAYS as string) ||
-  6;
-const queueUrl = process.env.MATTERS_USER_RETENTION_SENDMAIL_QUEUE_URL || "";
+  parseFloat(process.env.MATTERS_USER_RETENTION_INTERVAL_IN_DAYS as string) || 6
+const queueUrl = process.env.MATTERS_USER_RETENTION_SENDMAIL_QUEUE_URL || ''
 
 export const handler = async (event: any) => {
-  const client = new SQSClient({ region: process.env.AWS_REGIONAWS_REGION });
+  const client = new SQSClient({ region: process.env.AWS_REGIONAWS_REGION })
   const sendmail: SendmailFn = async (userId, lastSeen, type) => {
     try {
       await client.send(
@@ -25,11 +24,11 @@ export const handler = async (event: any) => {
           QueueUrl: queueUrl,
           MessageBody: JSON.stringify({ userId, lastSeen, type }),
         })
-      );
+      )
     } catch (error) {
-      console.error(error);
+      console.error(error)
     }
-  };
+  }
 
-  await processUserRetention({ intervalInDays, sendmail });
-};
+  await processUserRetention({ intervalInDays, sendmail })
+}

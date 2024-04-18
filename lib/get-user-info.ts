@@ -1,11 +1,11 @@
-import { sql } from "../lib/db.js";
+import { sql } from '../lib/db.js'
 
 export async function getUserInfo(userName: string, { year = 2022 } = {}) {
   const [user] =
-    await sql`SELECT * FROM public.user WHERE user_name=${userName}`;
+    await sql`SELECT * FROM public.user WHERE user_name=${userName}`
   if (!user) {
-    console.error(new Date(), "not found:", user);
-    throw new Error(`user not found`);
+    console.error(new Date(), 'not found:', user)
+    throw new Error(`user not found`)
   }
 
   // const year = 2022;
@@ -73,5 +73,5 @@ LEFT JOIN (
 ) b ON b.user_id=u.id
 WHERE -- user_name=$ {userName}
   u.id=${user.id}
-LIMIT 1 ;`;
+LIMIT 1 ;`
 }

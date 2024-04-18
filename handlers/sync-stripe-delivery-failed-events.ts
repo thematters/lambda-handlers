@@ -1,4 +1,4 @@
-import { syncStripeDeliveryFailedEvents } from "../lib/payment/utils.js";
+import { syncStripeDeliveryFailedEvents } from '../lib/payment/utils.js'
 
 // envs
 // MATTERS_ENV
@@ -6,4 +6,4 @@ import { syncStripeDeliveryFailedEvents } from "../lib/payment/utils.js";
 // MATTERS_SLACK_TOKEN
 // MATTERS_SLACK_STRIPE_ALERT_CHANNEL
 
-export const handler = async (event: any) => syncStripeDeliveryFailedEvents();
+export const handler = async (event: any) => syncStripeDeliveryFailedEvents()
