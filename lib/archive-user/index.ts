@@ -2,7 +2,8 @@ import { USER_STATE } from '../constants/index.js'
 
 import {
   getUserState,
-  deleteUnpublishedDrafts,
+  deleteDrafts,
+  deleteUnpulishedArticles,
   deleteUserAssets,
 } from './utils.js'
 
@@ -12,9 +13,12 @@ export const archiveUser = async (userId: string) => {
     console.warn(`Unexpected user state: ${state} for user ${userId}`)
     return
   }
-  // delete unlinked drafts
-  await deleteUnpublishedDrafts(userId)
+  // delete drafts
+  await deleteDrafts(userId)
 
-  // delete assets
+  // delete not active articles
+  await deleteUnpulishedArticles(userId)
+
+  // delete user assets
   await deleteUserAssets(userId)
 }
