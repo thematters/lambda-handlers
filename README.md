@@ -15,6 +15,7 @@ feat(lambda): multiple lambda handlers in one repo
 - [x] cloudflare-image-stats-alert (not using docker, copy the source code to lambda to deploy)
 - [x] sync-ga4-data
 - [x] archive-user
+- [x] daily-summary-email
 
 ## Dependencies
 

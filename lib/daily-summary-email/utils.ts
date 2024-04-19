@@ -1,5 +1,6 @@
 import { Base64 } from 'js-base64'
 import { makeSummary } from '@matters/ipns-site-generator'
+import slugify from '@matters/slugify'
 
 import { sql, pgKnex } from '../../lib/db.js'
 import { ARTICLE_STATE, NODE_TYPE } from '../constants/index.js'
@@ -15,8 +16,13 @@ type UserDigest = {
 type ArticlePartial = {
   id: string
   title: string
-  slug: string
   authorId: string
+  mediaHash: string
+}
+
+type ArticleVersion = {
+  id: string
+  title: string
   mediaHash: string
 }
 
@@ -48,13 +54,19 @@ export const getArticleDigest = async (article: ArticlePartial | null) => {
     return
   }
 
-  const [author, appreciationsReceivedTotal, articleCount, commentCount] =
-    await Promise.all([
-      findUser(article.authorId),
-      sumArticleAppreciation(article.id),
-      countArticleActiveCollectedBy(article.id),
-      countArticleComments(article.id),
-    ])
+  const [
+    articleVersion,
+    author,
+    appreciationsReceivedTotal,
+    articleCount,
+    commentCount,
+  ] = await Promise.all([
+    findArticleVersion(article.id),
+    findUser(article.authorId),
+    sumArticleAppreciation(article.id),
+    countArticleActiveCollectedBy(article.id),
+    countArticleComments(article.id),
+  ])
 
   const authorDigest = await getUserDigest(author)
   const responseCount = articleCount + commentCount
@@ -62,8 +74,8 @@ export const getArticleDigest = async (article: ArticlePartial | null) => {
   return {
     id: article.id,
     author: authorDigest,
-    title: article.title,
-    slug: encodeURIComponent(article.slug),
+    title: articleVersion?.title,
+    slug: encodeURIComponent(slugify(articleVersion?.title ?? '')),
     mediaHash: article.mediaHash,
     appreciationsReceivedTotal,
     responseCount,
@@ -94,7 +106,7 @@ export const getActors = async (actors: UserDigest[]) => {
 const findArticle = async (id: string): Promise<ArticlePartial | null> => {
   const result = await sql<
     ArticlePartial[]
-  >`SELECT id, title, slug, author_id, media_hash FROM article WHERE id = ${id}`
+  >`SELECT article.id, title, author_id, media_hash FROM article join article_version ON article.id = article_version.article_id AND article.id = ${id}`
   if (result.length !== 1) {
     return null
   }
@@ -145,6 +157,18 @@ const findUser = async (id: string): Promise<UserDigest | null> => {
   const result = await sql<
     UserDigest[]
   >`SELECT id, user_name, display_name, avatar FROM public.user WHERE id = ${id}`
+  if (result.length !== 1) {
+    return null
+  }
+  return result[0]
+}
+
+const findArticleVersion = async (
+  id: string
+): Promise<ArticleVersion | null> => {
+  const result = await sql<
+    ArticleVersion[]
+  >`SELECT id, title, media_hash FROM article_version_newest WHERE article_id = ${id}`
   if (result.length !== 1) {
     return null
   }
