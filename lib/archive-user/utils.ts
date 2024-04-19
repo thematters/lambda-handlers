@@ -31,7 +31,7 @@ export const deleteDrafts = async (authorId: string) => {
 export const deleteUnpulishedArticles = async (authorId: string) =>
   knex('article')
     .where({ authorId })
-    .andWhereNot('state', ARTICLE_STATE.active)
+    .whereIn('state', [ARTICLE_STATE.pending, ARTICLE_STATE.error])
     .del()
 
 export const deleteUserAssets = async (userId: string) => {

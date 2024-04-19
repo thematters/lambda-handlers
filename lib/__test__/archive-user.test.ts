@@ -40,6 +40,13 @@ test('archive users having data', async () => {
     .count()
   expect(errorAssetCount).toBe('0')
   expect(publishedAssetCount).toBe('1')
+
+  // unpublished article removed
+  const [{ count: unpublishedArticleCount }] = await knex('article')
+    .where({ authorId: user.id })
+    .whereIn('state', [ARTICLE_STATE.error, ARTICLE_STATE.pending])
+    .count()
+  expect(unpublishedArticleCount).toBe('0')
 })
 
 // helpers
