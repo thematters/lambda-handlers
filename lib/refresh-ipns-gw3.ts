@@ -1,7 +1,6 @@
 import path from 'node:path'
-import { Readable } from 'node:stream'
-// import { Blob } from "node:buffer";
 
+import slugify from '@matters/slugify'
 import { CID } from 'multiformats/cid'
 import shuffle from 'lodash/shuffle.js'
 
@@ -12,13 +11,10 @@ import { dbApi, Item } from '../lib/db.js'
 const GW3_API_BASE_URL = 'https://gw3.io'
 const GW3_ACCOUNT_API_BASE_URL = 'https://account.gw3.io'
 
-// import { Client } from 'gw3-sdk';
 const gw3AccessKey = process.env.GW3_ACCESS_KEY || ''
 const gw3AccessSecret = process.env.GW3_ACCESS_SECRET || ''
 const MATTERS_SITE_DOMAIN_PREFIX =
   process.env.MATTERS_SITE_DOMAIN_PREFIX || 'matters.town'
-
-// export const gw3Client = new Client(gw3AccessKey, gw3AccessSecret);
 
 function getTs() {
   return Math.floor(Date.now() / 1000).toString()
@@ -42,12 +38,6 @@ class GW3Client {
     }
     this.#config = { baseURL: 'https://gw3.io' }
   }
-  #makeAuthHeaders() {
-    return {
-      'X-Access-Key': this.#gw3AccessKey,
-      'X-Access-Secret': this.#gw3AccessSecret,
-    }
-  }
 
   async addPin(cid: string, name?: string) {
     const u = new URL(
@@ -61,7 +51,7 @@ class GW3Client {
 
     const res = await fetch(u, {
       method: 'POST',
-      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+      headers: this.#authHeaders,
     })
     // console.log(new Date(), "addPin res:", res.ok, res.status, res.headers);
 
@@ -74,7 +64,7 @@ class GW3Client {
     )
     const res = await fetch(u, {
       method: 'POST',
-      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+      headers: this.#authHeaders,
     })
     // console.log(new Date(), "rmPin res:", res.ok, res.status, res.headers);
 
@@ -93,7 +83,7 @@ class GW3Client {
 
     const res = await fetch(u, {
       method: 'GET',
-      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+      headers: this.#authHeaders,
     })
     return res.json()
   }
@@ -102,7 +92,7 @@ class GW3Client {
     const u = `${GW3_ACCOUNT_API_BASE_URL}/api/v0/pin/${cid}?ts=${getTs()}`
     const res = await fetch(u, {
       method: 'GET',
-      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+      headers: this.#authHeaders,
     })
     // console.log(new Date(), "getPin res:", res.ok, res.status, res.headers);
 
@@ -113,7 +103,7 @@ class GW3Client {
     const u = `${GW3_ACCOUNT_API_BASE_URL}/api/v0/pin/rename?ts=${getTs()}`
     const res = await fetch(u, {
       method: 'POST',
-      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+      headers: this.#authHeaders,
       body: JSON.stringify({ cid, name }),
     })
     // console.log(new Date(), "getPin res:", res.ok, res.status, res.headers);
@@ -140,7 +130,7 @@ class GW3Client {
     const u = `${GW3_API_BASE_URL}/api/v0/dag/get?ts=${getTs()}&arg=${cid}`
     const res = await fetch(u, {
       method: 'GET',
-      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+      headers: this.#authHeaders,
     })
     console.log(
       new Date(),
@@ -164,7 +154,7 @@ class GW3Client {
       `https://gw3.io/api/v0/dag/import?size=${size}&ts=${getTs()}`,
       {
         method: 'POST',
-        headers: this.#authHeaders, // this.#makeAuthHeaders(),
+        headers: this.#authHeaders,
       }
     )
     console.log(
@@ -215,7 +205,7 @@ class GW3Client {
       `https://gw3.io/api/v0/folder/${cid}?ts=${getTs()}`,
       {
         method: 'PUT',
-        headers: this.#authHeaders, // this.#makeAuthHeaders(),
+        headers: this.#authHeaders,
       }
     )
     if (!res.ok) {
@@ -253,7 +243,7 @@ class GW3Client {
       `https://gw3.io/api/v0/folder/operation?ts=${getTs()}`,
       {
         method: 'POST',
-        headers: this.#authHeaders, // this.#makeAuthHeaders(),
+        headers: this.#authHeaders,
         body: JSON.stringify(reqBody),
       }
     )
@@ -286,7 +276,7 @@ class GW3Client {
       u.searchParams.set('pin', `${pin}`)
     const res = await fetch(u, {
       method: 'POST',
-      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+      headers: this.#authHeaders,
     })
 
     console.log(
@@ -325,7 +315,7 @@ class GW3Client {
     }
     const res = await fetch(`https://gw3.io/api/v0/name/import?ts=${getTs()}`, {
       method: 'POST',
-      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+      headers: this.#authHeaders,
       body: JSON.stringify(reqBody),
     })
     console.log(
@@ -346,7 +336,7 @@ class GW3Client {
     u.searchParams.set('key', kid)
     const res = await fetch(u, {
       method: 'POST',
-      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+      headers: this.#authHeaders,
     })
     // console.log(new Date(), "rmIPNS res:", res.ok, res.status, res.headers);
 
@@ -357,7 +347,7 @@ class GW3Client {
     const u = `${GW3_ACCOUNT_API_BASE_URL}/api/v0/ipns/${kid}?ts=${getTs()}`
     const res = await fetch(u, {
       method: 'GET',
-      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+      headers: this.#authHeaders,
     })
     // console.log(new Date(), "getPin res:", res.ok, res.status, res.headers);
 
@@ -371,7 +361,7 @@ class GW3Client {
     u.searchParams.set('alias', alias)
     const res = await fetch(u, {
       method: 'GET',
-      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+      headers: this.#authHeaders,
     })
     console.log(new Date(), 'search IPNS res:', res.ok, res.status, res.headers)
 
@@ -382,7 +372,7 @@ class GW3Client {
     const u = new URL(`${GW3_ACCOUNT_API_BASE_URL}/api/v0/stats?ts=${getTs()}`)
     const res = await fetch(u, {
       method: 'GET',
-      headers: this.#authHeaders, // this.#makeAuthHeaders(),
+      headers: this.#authHeaders,
     })
     // console.log( new Date(), "get usage stats res:", res.ok, res.status, res.headers);
 
@@ -413,8 +403,8 @@ export async function refreshPinLatest({
     new Date(),
     `got ${articles.length} latest articles`,
     articles.map(
-      ({ id, slug, userName }) =>
-        `${MATTERS_SITE_DOMAIN_PREFIX}/@${userName}/${id}-${slug}`
+      ({ id, userName, title }) =>
+        `${MATTERS_SITE_DOMAIN_PREFIX}/@${userName}/${id}-${slugify(title)}`
     )
   )
 
@@ -427,11 +417,11 @@ export async function refreshPinLatest({
 
     const res = await Promise.all(
       articles.map(
-        async ({ id, slug, userName, dataHash }) =>
+        async ({ id, userName, dataHash, title }) =>
           dataHash && {
             userName,
             dataHash,
-            path: `matters.town/@${userName}/${id}-${slug}`,
+            path: `matters.town/@${userName}/${id}-${slugify(title)}`,
             ...(await gw3Client.getPin(dataHash)),
           }
       )
@@ -460,16 +450,18 @@ export async function refreshPinLatest({
   const skipStatuses = new Set(['pinned', 'pinning'])
   const resAdd = await Promise.all(
     articles.map(
-      async ({ id, slug, userName, dataHash }) =>
+      async ({ id, userName, dataHash, title }) =>
         dataHash && {
           userName,
           dataHash,
-          path: `matters.town/@${userName}/${id}-${slug}`,
+          path: `matters.town/@${userName}/${id}-${slugify(title)}`,
           ...(statusByCid.get(dataHash)?.status in skipStatuses
             ? statusByCid.get(dataHash)
             : await gw3Client.addPin(
                 dataHash,
-                `${MATTERS_SITE_DOMAIN_PREFIX}/@${userName}/${id}-${slug}`
+                `${MATTERS_SITE_DOMAIN_PREFIX}/@${userName}/${id}-${slugify(
+                  title
+                )}`
               )),
         }
     )
@@ -485,11 +477,11 @@ export async function refreshPinLatest({
 
     const res = await Promise.all(
       articles.map(
-        async ({ id, slug, userName, dataHash }) =>
+        async ({ id, title, userName, dataHash }) =>
           dataHash && {
             userName,
             dataHash,
-            path: `matters.town/@${userName}/${id}-${slug}`,
+            path: `matters.town/@${userName}/${id}-${slugify(title)}`,
             ...(await gw3Client.getPin(dataHash)),
           }
       )
@@ -521,7 +513,7 @@ export async function refreshPinLatest({
       name
         ? path.basename(name)
         : arti
-        ? `${arti.id}-${arti.slug}`
+        ? `${arti.id}-${arti.title}`
         : `${new Date().toISOString()}`,
       cid,
     ]
@@ -884,7 +876,6 @@ export async function refreshIPNSFeed(
     )
     // return;
   }
-  // if (useMattersIPNS == null) { // undefined
   console.log(
     new Date(),
     `input useMattersIPNS:`,
@@ -905,16 +896,12 @@ export async function refreshIPNSFeed(
     authorId: author.id,
     take: limit,
   })
-  const drafts = await dbApi.listDrafts({
-    ids: articles.map((item: Item) => item.draftId as string),
-    take: limit,
-  })
 
   const lastArti = articles[0]
 
   console.log(
     new Date(),
-    `get ${articles.length} articles /${drafts.length} drafts for author: '${author.displayName} (@${author.userName})', last_article:`,
+    `get ${articles.length} articles for author: '${author.displayName} (@${author.userName})', last_article:`,
     lastArti
   )
   if (articles.length <= 10) {
@@ -940,7 +927,6 @@ export async function refreshIPNSFeed(
     author,
     ipnsKey: ipnsKeyRec?.ipnsKey,
     webfHost,
-    drafts,
     articles,
   })
   // console.log(new Date(), "get author feed:", feed);
@@ -1001,7 +987,7 @@ export async function refreshIPNSFeed(
 
   const dateSuffix = new Date().toISOString().substring(0, 13)
   const directoryName = `${kname}-with-${lastArti?.id || ''}-${
-    lastArti?.slug || ''
+    slugify(lastArti?.title) || ''
   }@${dateSuffix}`
 
   if (useMattersIPNS && ipnsKeyRec?.privKeyPem) {
@@ -1115,29 +1101,28 @@ export async function refreshIPNSFeed(
     dagLinks?.Links?.map((e: any) => e.Hash['/'])?.filter(Boolean)
   )
 
-  articles // .slice(0, limit)
-    .forEach((arti) => {
-      if (arti.dataHash && !existingCids.has(arti.dataHash)) {
-        addEntries.push([`${arti.id}-${arti.slug}`, arti.dataHash])
+  articles.forEach((arti) => {
+    if (arti.dataHash && !existingCids.has(arti.dataHash)) {
+      addEntries.push([`${arti.id}-${slugify(arti.title)}`, arti.dataHash])
 
-        promises.push(
-          gw3Client
-            .addPin(
-              arti.dataHash,
-              `matters.town/@${author.userName}/${arti.id}-${arti.slug}`
-            )
-            .then((resData) => {
-              if (resData?.code !== 200) {
-                console.error(
-                  new Date(),
-                  `failed add pin ${arti.dataHash}:`,
-                  resData
-                )
-              }
-            })
-        )
-      }
-    })
+      promises.push(
+        gw3Client
+          .addPin(
+            arti.dataHash,
+            `matters.town/@${author.userName}/${arti.id}-${slugify(arti.title)}`
+          )
+          .then((resData) => {
+            if (resData?.code !== 200) {
+              console.error(
+                new Date(),
+                `failed add pin ${arti.dataHash}:`,
+                resData
+              )
+            }
+          })
+      )
+    }
+  })
   console.log(new Date(), `wait adding non-existed ${promises.length} cids.`)
   if (promises.length > 0) {
     await Promise.all(promises)
@@ -1244,7 +1229,10 @@ export async function refreshIPNSFeed(
         .filter(({ dataHash }) => dataHash && !waitCids.has(dataHash))
         .map(
           (arti) =>
-            [`${arti.id}-${arti.slug}`, arti.dataHash] as [string, string]
+            [`${arti.id}-${slugify(arti.title)}`, arti.dataHash] as [
+              string,
+              string
+            ]
         )
     : addEntries.filter(([name, cid]) => {
         if (existingLinks.get(name)?.Hash?.['/'] === cid) return false // already there, no need to re-attach
@@ -1383,21 +1371,21 @@ export async function refreshIPNSFeed(
   const toUnpinCids = new Set<string>(existingCids)
 
   const missingEntries = articles.filter(
-    ({ id, slug, dataHash }) =>
+    ({ id, title, dataHash }) =>
       // !(existingLinks.get(name)?.Hash["/"] === cid) && waitCids.has(cid)
-      !existingLinks.has(`${id}-${slug}`)
+      !existingLinks.has(`${id}-${slugify(title)}`)
   )
   const missingEntriesInLast50 = articles.slice(0, 50).filter(
-    ({ id, slug, dataHash }) =>
+    ({ id, title, dataHash }) =>
       // !(existingLinks.get(name)?.Hash["/"] === cid) && waitCids.has(cid)
-      !existingLinks.has(`${id}-${slug}`)
+      !existingLinks.has(`${id}-${slugify(title)}`)
   )
   if (missingEntries.length > 0) {
     console.log(
       new Date(),
       `still has ${missingEntries.length} entries missing:`,
-      missingEntries.map(({ id, slug, dataHash }) => ({
-        path: `${id}-${slug}`,
+      missingEntries.map(({ id, title, dataHash }) => ({
+        path: `${id}-${slugify(title)}`,
         dataHash,
       }))
     )
@@ -1411,7 +1399,7 @@ export async function refreshIPNSFeed(
 
   const statsData = {
     userName: author.userName,
-    limit: Math.max(articles.length, drafts.length),
+    limit: articles.length,
     missing: missingEntries.length,
     missingInLast50:
       missingEntries.length === 0 ? undefined : missingEntriesInLast50.length,
@@ -1477,9 +1465,9 @@ export async function refreshIPNSFeed(
 
   console.log(
     new Date(),
-    `updated for author: '${author.displayName} (@${author.userName})' at ${webfHost}: get ${articles.length} articles /${drafts.length} drafts`,
-    missingEntriesInLast50.map(({ id, slug, dataHash }) => ({
-      path: `${id}-${slug}`,
+    `updated for author: '${author.displayName} (@${author.userName})' at ${webfHost}: get ${articles.length} articles`,
+    missingEntriesInLast50.map(({ id, title, dataHash }) => ({
+      path: `${id}-${slugify(title)}`,
       dataHash,
     })),
     statsData

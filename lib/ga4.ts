@@ -1,6 +1,11 @@
 import { BetaAnalyticsDataClient } from '@google-analytics/data'
 
-import { pgKnexRO as knexRO, pgKnex as knex } from './db.js'
+import {
+  pgKnexRO as knexRO,
+  pgKnex as knex,
+  type ArticleVersionDB,
+  type ArticleDB,
+} from './db.js'
 
 const propertyId = process.env.MATTERS_GA4_PROPERTY_ID
 const projectId = process.env.MATTERS_GA4_PROJECT_ID
@@ -97,7 +102,7 @@ export const convertAndMerge = async (rows: Row[]): Promise<MergedData> => {
     }))
   )
   const res: MergedData = {}
-  const ret = await knexRO('article').max('id').first()
+  const ret = await knexRO<ArticleDB>('article').max('id').first()
   const maxLegalId = ret ? parseInt(ret.max) : 0
   for (const row of await converted) {
     if (row.id in res) {
@@ -127,7 +132,7 @@ const pathToId = async (path: string) => {
 }
 
 const hashToId = async (hash: string) => {
-  const res = await knexRO('draft')
+  const res = await knexRO<ArticleVersionDB>('article_version')
     .where({ mediaHash: hash })
     .select('article_id')
     .first()

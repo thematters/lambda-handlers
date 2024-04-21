@@ -332,6 +332,26 @@ LIMIT 100 ;`
   } while (retries <= 1)
 }
 
+interface Article {
+  id: string
+  articleId: string
+  title: string
+  titleOrig?: string
+  authorId: string | number
+  slug: string
+  summary: string
+  content?: string
+  textContent?: string
+  textContentConverted?: string
+  createdAt: Date | string
+  numViews?: number
+  state: string
+  authorState: string
+  lastReadAt?: Date
+  userName?: string
+  dataHash?: string
+}
+
 // searchKey is a sample search key
 export async function refreshSearchIndexArticle({
   searchKey = 'tag',
@@ -347,7 +367,7 @@ export async function refreshSearchIndexArticle({
       range,
       orderBy: 'seqDesc',
     })
-    .cursor(BATCH_SIZE)) {
+    .cursor(BATCH_SIZE) as AsyncIterable<Article[]>) {
     console.log(`got ${articles.length} rows:`)
     await Promise.allSettled(
       articles.map(async (arti, idx) => {

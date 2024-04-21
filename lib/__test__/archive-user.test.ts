@@ -202,7 +202,7 @@ const createArchiveUserData = async ({ hasData }: { hasData: boolean }) => {
       .insert([
         {
           content: '<div>some html string</div>',
-          hash: 'testhash',
+          hash: 'testhash' + randomUUID(),
         },
       ])
       .returning('id')

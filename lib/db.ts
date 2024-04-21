@@ -31,26 +31,121 @@ const pgSearchDatabaseURL =
   'postgresql://no-exist@no-exist/no-exist'
 export const sqlSIW = getPostgresJsClient(pgSearchDatabaseURL)
 
-// import { Article } from "../lib/pg-zhparser-articles-indexer.js";
+export interface UserDB {
+  id: string
+  uuid: string
+  userName: string
+  displayName: string
+  description: string
+  avatar: string
+  email: string | null
+  emailVerified: boolean
+  likerId: string | null
+  passwordHash: string | null
+  paymentPointer: string | null
+  paymentPasswordHash: string | null
+  baseGravity: number
+  currGravity: number
+  state: 'frozen' | 'active' | 'banned' | 'archived'
+  agreeOn: string
+  ethAddress: string | null
+  currency: 'HKD' | 'TWD' | 'USD' | null
+  profileCover?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  extra: any | null // jsonb saved here
+  remark: string | null
+  createdAt: Date
+  updatedAt: Date
+}
 
-export interface Article {
+export interface ArticleDB {
+  id: string
+  authorId: string
+  state: 'active' | 'archived' | 'banned' | 'pending' | 'error'
+  revisionCount: number
+  sensitiveByAdmin: boolean
+  pinned: boolean
+  pinnedAt: Date | null
+  createdAt: Date
+  updatedAt: Date
+  remark: string | null
+  shortHash: string
+}
+
+export interface ArticleVersionDB {
   id: string
   articleId: string
   title: string
-  titleOrig?: string
-  authorId: string | number
-  slug: string
+  cover: string | null
   summary: string
-  content?: string
-  textContent?: string
-  textContentConverted?: string
-  createdAt: Date | string
-  numViews?: number
+  contentId: string
+  contentMdId: string | null
+  summaryCustomized: boolean
+  wordCount: number
+  dataHash: string
+  mediaHash: string
+  tags: string[]
+  connections: string[]
+  replyToDonator: string | null
+  requestForDonation: string | null
+  canComment: boolean
+  sensitiveByAuthor: boolean
+  sticky: boolean
+  language: string | null
+  iscnId: string | null
+  circleId: string | null
+  description: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface AuthorArticle {
+  id: string
+  title: string
+  summary: string
+  content: string
+  dataHash: string
+  state: string
+  tags: string[]
+  createdAt: Date
+}
+
+export interface Article {
+  id: string
+  title: string
+  authorId: string
+  userName: string
+  summary: string
+  content: string
   state: string
   authorState: string
-  lastReadAt?: Date
-  userName?: string
-  dataHash?: string
+  dataHash: string
+  createdAt: Date
+}
+
+interface RencentArticle {
+  id: string
+  title: string
+  userName: string
+  summary: string
+  dataHash: string
+}
+
+export interface ArticleToPublish {
+  id: string
+  articleVersionId: string
+  title: string
+  userName: string
+  summary: string
+  content: string
+  cover: string
+  circleId: string
+  access: string
+  state: string
+  dataHash: string
+  tags: string[]
+  updatedAt: Date
+  createdAt: Date
 }
 
 export interface Item {
@@ -77,14 +172,12 @@ export class DbApi {
     articleIds,
     take = 5,
     skip = 0,
-    // batchSize = 5,
     range = '1 week',
     orderBy = 'lastRead',
   }: {
     articleIds?: string[]
     take?: number
     skip?: number
-    // batchSize?: number;
     range?: string
     orderBy?: 'lastRead' | 'seqDesc'
   } = {}) {
@@ -92,20 +185,21 @@ export class DbApi {
       articleIds,
       take,
       skip,
-      // batchSize,
     })
     const allRecentChangedArticleIds = sqlRO` ( SELECT DISTINCT id FROM article WHERE updated_at >= CURRENT_DATE - ${range} ::interval ) ` // include state change
     const allRecentReadArticleIds = sqlRO` ( SELECT DISTINCT article_id FROM article_read_count WHERE user_id IS NOT NULL AND created_at >= CURRENT_DATE - ${range} ::interval ) `
     const allRecentPublishedArticles = sqlRO` ( SELECT id FROM article WHERE created_at >= CURRENT_DATE - ${range} ::interval ) ` // this is actually included in allRecentChangedArticleIds
 
     return sqlRO<Article[]>`-- check articles from past week
-SELECT * -- a.*, num_views, extract(epoch from last_read_at) AS last_read_timestamp
+SELECT *
 FROM (
-  SELECT -- draft.id,
-    a.id, a.title, a.summary, a.slug, a.draft_id, a.summary, a.data_hash, user_name,
-    draft.content, draft.author_id, a.created_at, a.state, author.state AS author_state, draft.publish_state
-  FROM article a JOIN draft ON draft_id=draft.id -- AND article_id=article.id
-  LEFT JOIN public.user author ON author.id=draft.author_id
+  SELECT
+    a.id, avn.title, avn.summary, avn.data_hash, user_name,
+    ac.content, a.author_id, a.created_at, a.state, author.state AS author_state
+  FROM public.article a
+  JOIN public.article_version_newest avn ON a.id=avn.article_id
+  JOIN public.article_content ac ON avn.content_id=ac.id
+  LEFT JOIN public.user author ON author.id=a.author_id
   WHERE
     ${
       Array.isArray(articleIds)
@@ -128,49 +222,40 @@ ORDER BY ${orderBy === 'lastRead' ? sql`last_read_at DESC NULLS LAST,` : sql``}
 LIMIT ${take} OFFSET ${skip} ; `
   }
 
-  listRecentArticles({ take = 100, skip = 0, state = ['active'] } = {}) {
-    return sqlRO<[Item]>`-- list recent articles
-SELECT article.id, slug, title, summary, data_hash, user_name
-FROM public.article
+  listRecentArticles({ take = 100, skip = 0 } = {}) {
+    return sqlRO<RencentArticle[]>`-- list recent articles
+SELECT a.id, avn.title, avn.summary, avn.data_hash, user_name
+FROM public.article a
+LEFT JOIN public.article_version_newest avn ON a.id=avn.article_id
 LEFT JOIN public.user author ON author_id=author.id
-WHERE article.state IN ('active') AND author.state NOT IN ('archived', 'bannded')
-ORDER BY article.id DESC
+WHERE a.state IN ('active') AND author.state NOT IN ('archived', 'bannded')
+ORDER BY a.id DESC
 LIMIT ${take} OFFSET ${skip} ;`
   }
-  listRecentArticlesToPublish({
-    userName = '',
-    take = 100,
-    skip = 0,
-    // state = ["active"],
-  } = {}) {
-    return sqlRO<[Item]>`-- list recent articles
-SELECT article.id, article.slug, article.title, article.summary, article.data_hash, user_name, draft.content, draft.tags, draft_id, article_id
-FROM public.article
-LEFT JOIN public.draft ON article_id=article.id
-LEFT JOIN public.user author ON article.author_id=author.id
-WHERE article.state IN ('active') AND author.state NOT IN ('archived', 'banned')
+
+  listRecentArticlesToPublish({ userName = '', take = 100, skip = 0 } = {}) {
+    return sqlRO<ArticleToPublish[]>`-- list recent articles
+SELECT
+  a.id, avn.id as article_version_id, avn.title, avn.summary, ac.content, avn.data_hash, user_name,
+  avn.tags, a.state, avn.cover, avn.circle_id, avn.access, a.updated_at, a.created_at
+FROM public.article a
+LEFT JOIN public.article_version_newest avn ON a.id=avn.article_id
+LEFT JOIN public.article_content ac ON avn.content_id=ac.id
+LEFT JOIN public.user author ON a.author_id=author.id
+WHERE a.state IN ('active') AND author.state NOT IN ('archived', 'banned')
   ${userName ? sqlRO`AND author.user_name IN (${userName})` : sqlRO``}
-  AND publish_state IN ('published')
-  AND article.data_hash IS NULL
-ORDER BY article.id DESC
+  AND a.data_hash IS NULL
+ORDER BY a.id DESC
 LIMIT ${take} OFFSET ${skip} ;`
   }
+
   updateArticleDataMediaHash(
-    id: number | string,
+    articleVersionId: number | string,
     { dataHash, mediaHash }: { dataHash: string; mediaHash: string }
   ) {
-    return Promise.all([
-      sql<[Item]>`
-WITH cte AS ( SELECT id FROM public.article WHERE id IN (${id}) AND data_hash IS NULL AND media_hash IS NULL ORDER BY updated_at DESC LIMIT 1 )
-UPDATE public.article a SET data_hash=${dataHash}, media_hash=${mediaHash}
-FROM cte WHERE a.id=cte.id
-RETURNING * ;`,
-      sql<[Item]>`
-WITH cte AS ( SELECT id FROM public.draft WHERE article_id IN (${id}) AND data_hash IS NULL AND media_hash IS NULL ORDER BY updated_at DESC LIMIT 1 )
-UPDATE public.draft d SET data_hash=${dataHash}, media_hash=${mediaHash}
-FROM cte WHERE d.id=cte.id
-RETURNING * ;`,
-    ])
+    return sql<
+      ArticleVersionDB[]
+    >`UPDATE public.article_version av SET data_hash=${dataHash}, media_hash=${mediaHash} WHERE av.id=${articleVersionId} RETURNING * ;`
   }
 
   listAuthorArticles({
@@ -185,21 +270,14 @@ RETURNING * ;`,
     state?: string[]
   }) {
     return sqlRO<
-      [Item]
-    >`SELECT * FROM public.article WHERE author_id=${authorId} AND state =ANY(${state}) ORDER BY id DESC LIMIT ${take} OFFSET ${skip};`
-  }
-  listDrafts({
-    ids,
-    take = 50,
-    skip = 0,
-  }: {
-    ids: string[]
-    take?: number
-    skip?: number
-  }) {
-    return sqlRO<
-      [Item]
-    >`SELECT * FROM public.draft WHERE id=ANY(${ids}) AND article_id IS NOT NULL AND publish_state IN ('published') ORDER BY article_id DESC LIMIT ${take} OFFSET ${skip};`
+      AuthorArticle[]
+    >`SELECT a.id, avn.title, avn.summary, ac.content, avn.data_hash, avn.tags, a.created_at
+FROM public.article a
+LEFT JOIN public.article_version_newest avn ON a.id=avn.article_id
+LEFT JOIN public.article_content ac ON avn.content_id=ac.id
+WHERE author_id=${authorId} AND state =ANY(${state})
+ORDER BY id DESC
+LIMIT ${take} OFFSET ${skip};`
   }
 
   listRecentAuthors({
@@ -351,8 +429,11 @@ LIMIT ${take} OFFSET ${skip} ; `
   }
 
   getAuthor(userName: string) {
-    return sqlRO<[Item?]>`SELECT * FROM public.user WHERE user_name=${userName}`
+    return sqlRO<
+      UserDB[]
+    >`SELECT * FROM public.user WHERE user_name=${userName}`
   }
+
   getUserIPNSKey(userId: string | number) {
     return sqlRO<
       [Item?]
