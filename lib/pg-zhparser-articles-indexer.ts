@@ -39,7 +39,7 @@ export class ArticlesIndexer {
     const _articles: ConvertedArticle[] =
       articles as unknown as ConvertedArticle[]
     await Promise.allSettled(
-      (articles as unknown as ConvertedArticle[]).map(async (arti, idx) => {
+      _articles.map(async (arti, idx) => {
         const $ = cheerio.load(arti.content!)
         const text = $.text()
         arti.titleOrig = arti.title
