@@ -244,7 +244,7 @@ LEFT JOIN public.article_content ac ON avn.content_id=ac.id
 LEFT JOIN public.user author ON a.author_id=author.id
 WHERE a.state IN ('active') AND author.state NOT IN ('archived', 'banned')
   ${userName ? sqlRO`AND author.user_name IN (${userName})` : sqlRO``}
-  AND a.data_hash IS NULL
+  AND avn.data_hash IS NULL
 ORDER BY a.id DESC
 LIMIT ${take} OFFSET ${skip} ;`
   }
