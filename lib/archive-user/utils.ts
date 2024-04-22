@@ -42,7 +42,11 @@ export const deleteUserAssets = async (userId: string) => {
   await knex('oauth_client').where('user_id', userId).update({
     avatar: null,
   })
-  await deleteAsset({ entityTypeId: '1', entityId: userId })
+  const userEntity = await knex('entity_type')
+    .select('id')
+    .where({ table: 'user' })
+    .first()
+  await deleteAsset({ entityTypeId: userEntity.id, entityId: userId })
 }
 
 const getDraftEntityTypeId = async () => {
