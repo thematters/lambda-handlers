@@ -2,18 +2,21 @@ import { generateKeyPair } from 'node:crypto'
 import { promisify } from 'node:util'
 
 import {
-  // HomepageArticleDigest,
   ArticlePageContext,
   HomepageContext,
   makeArticlePage,
   makeHomepage,
   makeHomepageBundles,
-  makeActivityPubBundles,
 } from '@matters/ipns-site-generator'
 import slugify from '@matters/slugify'
 
 import { ipfsPool } from '../lib/ipfs-servers.js'
-import { dbApi, Item } from '../lib/db.js'
+import {
+  dbApi,
+  type ArticleToPublish,
+  type AuthorArticle,
+  type UserDB,
+} from '../lib/db.js'
 
 const generateKeyPairPromisified = promisify(generateKeyPair)
 
@@ -25,45 +28,30 @@ export const ARTICLE_ACCESS_TYPE = {
 const siteDomain = process.env.MATTERS_SITE_DOMAIN || 'matters.town'
 
 export class AuthorFeed {
-  author: Item
+  author: UserDB
   ipnsKey: string // the ipns key
 
   // internal use
-  publishedDrafts: Item[]
   userImg?: string | null
-  articles?: Map<string, Item>
+  articles: AuthorArticle[]
   webfHost?: string
-
-  // articleService: InstanceType<typeof ArticleService>
-  // draftService: InstanceType<typeof DraftService>
-  // tagService: InstanceType<typeof TagService>
-  // systemService: InstanceType<typeof SystemService>
 
   constructor({
     author,
     ipnsKey,
     webfHost,
-    drafts,
     articles,
   }: {
-    author: Item
+    author: UserDB
     ipnsKey: string
     webfHost?: string
-    drafts: Item[]
-    articles?: Item[]
+    articles: AuthorArticle[]
   }) {
     this.author = author
     this.ipnsKey = ipnsKey
     this.webfHost = webfHost || `${this.ipnsKey}.ipns.cf-ipfs.com`
 
-    // this.articleService = new ArticleService()
-    // this.draftService = new DraftService()
-    // this.systemService = new SystemService()
-
-    this.publishedDrafts = drafts
-    if (articles) {
-      this.articles = new Map(articles.map((arti) => [arti.id, arti]))
-    }
+    this.articles = articles
   }
 
   async loadData() {
@@ -107,30 +95,23 @@ export class AuthorFeed {
             json: './feed.json',
           }
         : undefined,
-      articles: this.publishedDrafts
-        // .sort((a, b) => +b.articleId - +a.articleId)
-        .map((draft) => {
-          const arti = this.articles?.get(draft.articleId)
-          if (!arti) return
-
+      articles: this.articles
+        .map((arti) => {
           return {
-            id: draft.articleId ?? arti.id,
+            id: arti.id,
             author: {
               userName,
               displayName,
             },
-            title: draft.title,
-            summary: draft.summary,
-            // date: draft.updatedAt,
-            date: arti.createdAt, // || draft.updatedAt,
-            content: draft.content,
+            title: arti.title,
+            summary: arti.summary,
+            date: arti.createdAt,
+            content: arti.content,
             // tags: draft.tags || [],
-            uri: `./${draft.articleId ?? arti.id}-${
-              arti.slug ?? slugify(arti.title)
-            }/`,
-            sourceUri: `https://${siteDomain}/@${userName}/${
-              draft.articleId ?? arti.id
-            }-${arti.slug ?? slugify(arti.title)}/`,
+            uri: `./${arti.id}-${slugify(arti.title)}/`,
+            sourceUri: `https://${siteDomain}/@${userName}/${arti.id}-${slugify(
+              arti.title
+            )}/`,
           }
         })
         .filter(Boolean) as any[],
@@ -140,9 +121,10 @@ export class AuthorFeed {
   }
 
   // dup from articleService.ts
-  async publishToIPFS(draft: Item) {
+  async publishToIPFS(article: ArticleToPublish) {
     // prepare metadata
     const {
+      id,
       title,
       content,
       summary,
@@ -150,16 +132,10 @@ export class AuthorFeed {
       tags,
       circleId,
       access,
-      authorId,
-      articleId,
       updatedAt: publishedAt,
-    } = draft
+    } = article
 
-    const {
-      userName,
-      displayName,
-      description, // paymentPointer
-    } = this.author
+    const { userName, displayName } = this.author
     const articleCoverImg = await dbApi.findAssetUrl(cover)
 
     const context: ArticlePageContext = {
@@ -172,7 +148,7 @@ export class AuthorFeed {
         siteDomain,
       },
       byline: {
-        date: publishedAt,
+        date: publishedAt as any,
         author: {
           name: `${displayName} (${userName})`,
           displayName,
@@ -194,14 +170,14 @@ export class AuthorFeed {
           }
         : undefined,
       article: {
-        id: articleId,
+        id,
         author: {
           userName,
           displayName,
         },
         title,
         summary,
-        date: publishedAt,
+        date: publishedAt as any,
         content,
         tags: tags?.map((t: string) => t.trim()).filter(Boolean) || [],
       },
@@ -213,7 +189,7 @@ export class AuthorFeed {
       console.error(
         new Date(),
         `TODO: support ARTICLE_ACCESS_TYPE.paywall`,
-        draft
+        article
       )
       return
     }
@@ -301,32 +277,26 @@ export class AuthorFeed {
             json: './feed.json',
           }
         : undefined,
-      articles: this.publishedDrafts
-        // .sort((a, b) => +b.articleId - +a.articleId)
-        .map((draft) => {
-          const arti = this.articles?.get(draft.articleId)
-          if (!arti) return
-
+      articles: this.articles
+        .map((arti) => {
           return {
-            id: draft.articleId ?? arti.id,
+            id: arti.id,
             author: {
               userName,
               displayName,
             },
-            title: draft.title,
-            slug: arti.slug ?? slugify(arti.title),
-            summary: draft.summary,
+            title: arti.title,
+            slug: slugify(arti.title),
+            summary: arti.summary,
             // date: draft.updatedAt,
-            date: arti.createdAt, // || draft.updatedAt,
-            content: draft.content,
+            date: arti.createdAt,
+            content: arti.content,
             // tags: draft.tags || [],
             createdAt: arti.createdAt,
-            uri: `./${draft.articleId ?? arti.id}-${
-              arti.slug ?? slugify(arti.title)
-            }/`,
-            sourceUri: `https://${siteDomain}/@${userName}/${
-              draft.articleId ?? arti.id
-            }-${arti.slug ?? slugify(arti.title)}/`,
+            uri: `./${arti.id}-${slugify(arti.title)}/`,
+            sourceUri: `https://${siteDomain}/@${userName}/${arti.id}-${slugify(
+              arti.title
+            )}/`,
           }
         })
         .filter(Boolean) as any[],
@@ -345,19 +315,17 @@ export class AuthorFeed {
     // const k = await generateKeyPairPromisified("rsa", { modulusLength: 4096, publicKeyEncoding: { type: "spki", format: "pem" }, privateKeyEncoding: { type: "pkcs8", format: "pem" }, });
 
     const actor = `https://${this.webfHost}/about.jsonld`
-    const outboxItems = this.publishedDrafts // .slice(0, 3); // test at most 3 entries
+    const outboxItems = this.articles // .slice(0, 3); // test at most 3 entries
     // .sort((a, b) => +b.articleId - +a.articleId)
     const outboxContent = {
       '@context': 'https://www.w3.org/ns/activitystreams',
       id: actor,
       type: 'OrderedCollection',
       totalItems: outboxItems.length,
-      orderedItems: outboxItems.map((draft) => {
-        const arti = this.articles?.get(draft.articleId)
-        if (!arti) return
-        const url = `https://${this.webfHost}/${draft.articleId ?? arti.id}-${
-          arti.slug ?? slugify(arti.title)
-        }/`
+      orderedItems: outboxItems.map((arti) => {
+        const url = `https://${this.webfHost}/${arti.id}-${slugify(
+          arti.title
+        )}/`
 
         return {
           '@context': 'https://www.w3.org/ns/activitystreams',

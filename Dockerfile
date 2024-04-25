@@ -21,7 +21,7 @@ RUN yum update -y && \
 
 WORKDIR /usr/app
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 
 ## the actual run image
 FROM public.ecr.aws/lambda/nodejs:18

@@ -300,10 +300,12 @@ const loadArticles = async (
 ): Promise<Article[]> => sql`
     SELECT
       article.id,
-      article.title,
+      avn.title,
       u.display_name,
-      article.media_hash
+      avn.media_hash
     FROM article 
+    INNER JOIN article_version avn
+      ON article.id = avn.article_id
     INNER JOIN public.user u
       ON author_id = u.id
         AND article.created_at >= ${lastSeen}

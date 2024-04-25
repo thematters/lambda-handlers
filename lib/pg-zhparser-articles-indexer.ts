@@ -8,13 +8,13 @@ import * as opencc from 'opencc'
 const OpenCC = (opencc as any).default
 const converter = new OpenCC('t2s.json')
 
-import { sqlSIW } from '../lib/db.js'
+import { sqlSIW, type Article } from '../lib/db.js'
 
 // https://www.atdatabases.org/docs/pg-bulk might be a better library on Bulk insert
 // otherwise, the library is inferring some wrong type 25 on the PostgreSQL wire protocol
 const ARRAY_TYPE = 1009
 
-export interface Article {
+interface ConvertedArticle {
   id: string
   articleId: string
   title: string
@@ -36,11 +36,12 @@ export class ArticlesIndexer {
   }
 
   async addToSearch(articles: Article[]) {
+    const _articles: ConvertedArticle[] =
+      articles as unknown as ConvertedArticle[]
     await Promise.allSettled(
-      articles.map(async (arti, idx) => {
+      _articles.map(async (arti, idx) => {
         const $ = cheerio.load(arti.content!)
         const text = $.text()
-        // arti.textContent = text;
         arti.titleOrig = arti.title
         ;[arti.title, arti.summary, arti.textContentConverted] =
           await Promise.all([
@@ -75,13 +76,13 @@ INSERT INTO search_index.article(id, title, author_id, summary, text_content_con
       ARRAY_TYPE
     )} ::text[],
     ${sqlSIW.array(
-      articles.map(
+      _articles.map(
         ({ textContentConverted }) => textContentConverted
       ) as string[],
       ARRAY_TYPE
     )} ::text[],
     ${sqlSIW.array(
-      articles.map(({ numViews }) => numViews) as number[],
+      _articles.map(({ numViews }) => numViews) as number[],
       ARRAY_TYPE
     )} ::int[],
     ${sqlSIW.array(
@@ -91,7 +92,7 @@ INSERT INTO search_index.article(id, title, author_id, summary, text_content_con
       ARRAY_TYPE
     )} ::timestamptz[],
     ${sqlSIW.array(
-      articles.map(({ lastReadAt }) => lastReadAt?.toISOString()) as string[],
+      _articles.map(({ lastReadAt }) => lastReadAt?.toISOString()) as string[],
       ARRAY_TYPE
     )} ::timestamptz[]
   )
@@ -106,11 +107,7 @@ DO UPDATE
     , indexed_at = CURRENT_TIMESTAMP
 
 RETURNING * ;`
-    debugLog(
-      new Date(),
-      `inserted (or updated) ${res.length} items:`
-      // res.map(({ id, userName }) => `/@${userName}-${id}`) // .rows
-    )
+    debugLog(new Date(), `inserted (or updated) ${res.length} items:`)
   }
 }
 

@@ -1,12 +1,9 @@
 #!/usr/bin/env -S node --trace-warnings --loader ts-node/esm
-
 import process from 'node:process'
+import slugify from '@matters/slugify'
 
-import { dbApi, sql } from '../lib/db.js'
-import {
-  articlesIndexer,
-  Article,
-} from '../lib/pg-zhparser-articles-indexer.js'
+import { dbApi, sql, type Article } from '../lib/db.js'
+import { articlesIndexer } from '../lib/pg-zhparser-articles-indexer.js'
 
 const BATCH_SIZE = Number.parseInt(process.env.BATCH_SIZE || '', 10) || 100
 
@@ -80,7 +77,7 @@ async function processArticles(articles: Article[]) {
   console.log(
     new Date(),
     `added ${articles.length} articles to search:`,
-    articles.map(({ id, title, slug }) => `${id}-${slug ?? slugify(title)}`),
+    articles.map(({ id, title }) => `${id}-${slugify(title)}`),
     res
   )
 }
@@ -102,8 +99,3 @@ function handle(signal: string) {
 
 process.on('SIGINT', handle)
 process.on('exit', handle)
-
-// a simple slugify
-function slugify(title: string) {
-  return title.replaceAll(/[\s\p{P}]+/gu, '-').replaceAll(/(^-+|-+$)/g, '')
-}

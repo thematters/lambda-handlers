@@ -1,23 +1,14 @@
 #!/usr/bin/env -S node --trace-warnings --loader ts-node/esm
 
-import path from 'node:path'
-import shuffle from 'lodash/shuffle.js'
-import {
-  // HomepageArticleDigest,
-  HomepageContext,
-  makeHomepage,
-} from '@matters/ipns-site-generator'
 import slugify from '@matters/slugify'
 
 import {
-  // gw3Client,
   refreshPinLatest,
   refreshIPNSFeed,
   purgeIPNS,
 } from '../lib/refresh-ipns-gw3.js'
 import { AuthorFeed } from '../lib/author-feed-ipns.js'
-import { ipfsPool } from '../lib/ipfs-servers.js'
-import { dbApi, Item } from '../lib/db.js'
+import { dbApi } from '../lib/db.js'
 
 async function main() {
   const args = process.argv.slice(2)
@@ -44,13 +35,9 @@ async function main() {
       take: limit,
       skip: offset,
     })
-    const drafts = await dbApi.listDrafts({
-      ids: articles.map((item: Item) => item.draftId as string),
-      take: limit,
-    })
     console.log(
       new Date(),
-      `found ${articles.length} articles /${drafts.length} drafts not published:`,
+      `found ${articles.length} articles not published:`,
       articles
     )
 
@@ -64,13 +51,11 @@ async function main() {
     const [ipnsKeyRec] = await dbApi.getUserIPNSKey(author.id)
     console.log(new Date(), 'get user ipns:', ipnsKeyRec)
 
-    // const feed = new AuthorFeed({ author, ipnsKey: ipnsKeyRec?.ipnsKey, webfHost, drafts, articles });
     const feed = new AuthorFeed({
       author,
       ipnsKey: ipnsKeyRec?.ipnsKey,
       // webfHost, // this is a fake one; no need for single article publishing
-      drafts, // .slice(0, 1),
-      articles, // .slice(0, 1)
+      articles,
     })
 
     // console.log(new Date(), "get author feed:", feed);
@@ -81,13 +66,13 @@ async function main() {
       `found ${articles.length} articles to publish:`,
       articles
     )
-    for (const draft of drafts.slice(0, 1)) {
-      const res = await feed.publishToIPFS(draft)
+    for (const article of articles.slice(0, 1)) {
+      const res = await feed.publishToIPFS(article)
       console.log(new Date(), `from published IPFS:`, res)
       if (!res) continue
-      const { contentHash, mediaHash, key } = res
+      const { contentHash, mediaHash } = res
       const dbRes = await dbApi.updateArticleDataMediaHash(
-        drafts[0].articleId,
+        article.articleVersionId,
         {
           dataHash: contentHash,
           mediaHash,
