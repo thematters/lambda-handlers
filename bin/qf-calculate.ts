@@ -2,7 +2,7 @@
 
 import {
   calculateQFScore,
-  checkDropEventsAndNotifs,
+  // checkDropEventsAndNotifs,
 } from '../lib/qf-calculate.js'
 
 async function main() {
@@ -16,9 +16,7 @@ async function main() {
       args.shift()
       break
   }
-  if (mode === 'checkDropEventsAndNotifs') {
-    return checkDropEventsAndNotifs()
-  }
+  // if (mode === 'checkDropEventsAndNotifs') { return checkDropEventsAndNotifs() }
 
   const amountTotal = BigInt(+(args?.[0] || 10_000))
 

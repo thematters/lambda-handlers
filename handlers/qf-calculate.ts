@@ -4,11 +4,13 @@ import { formatUnits } from 'viem'
 import * as d3 from 'd3-array'
 import {
   calculateQFScore,
-  sendQfNotifications, //  sendQfNotificationNEmails,
   MattersBillboardS3Bucket,
   isProd,
   s3FilePathPrefix,
 } from '../lib/qf-calculate.js'
+import {
+  sendQfNotifications, //  sendQfNotificationNEmails,
+} from '../lib/qf-notify.js'
 import { s3GetFile } from '../lib/utils/aws.js'
 import { SLACK_MESSAGE_STATE, Slack } from '../lib/utils/slack.js'
 
@@ -92,7 +94,12 @@ export const handler = async (
     }
   } else if (method === 'POST' && path === '/send-notifications' && accept) {
     // get distrib.json and send notifications;
-    let { key = 'latest', roundEnd, amountTotal = '' } = queryStringParameters
+    let {
+      key = 'latest',
+      roundEnd,
+      amountTotal = '',
+      sharesTotal = 10_000,
+    } = queryStringParameters
     // let key = (queryStringParameters?.key || 'latest') as string
     // get latest round path to distrib.json
     try {
@@ -114,6 +121,7 @@ export const handler = async (
           }
           if (!amountTotal && latestRound?.amountTotal) {
             amountTotal = latestRound?.amountTotal
+            sharesTotal = latestRound?.sharesTotal
           }
         }
       }
@@ -144,6 +152,8 @@ export const handler = async (
       const distribs = JSON.parse(await res1.Body.transformToString())
       const sent = await sendQfNotifications(
         distribs,
+        amountTotal,
+        sharesTotal,
         roundEnd,
         queryStringParameters?.doNotify === 'true'
       )
