@@ -145,39 +145,6 @@ jobs:
       - name: Check if Motor Lambda running well on prod
         run: echo Invoke AWS Lambda if check-motor-prod running well && env
 
-  ### Meili Indexer
-  deploy-meili-indexer-dev:
-    runs-on: 'ubuntu-latest'
-    environment: 'dev'
-    needs: build-and-publish
-    steps:
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: re-deploy Meili Indexer Lambda to dev
-        run: |
-          aws lambda update-function-code --function-name refresh-search-index-dev \
-            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
-        env:
-          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
-
-  deploy-meili-indexer-prod:
-    runs-on: 'ubuntu-latest'
-    environment: 'prod'
-    needs: [build-and-publish, deploy-meili-indexer-dev]
-    steps:
-      - name: re-deploy Meili Indexer Lambda to prod
-        run: echo call lambda re-deploy meili-indexer-prod
-
-  check-meili-indexer-running:
-    runs-on: 'ubuntu-latest'
-    environment: 'dev'
-    needs: [build-and-publish, deploy-meili-indexer-dev]
-    steps:
-      - name: Check if Meili Indexer Lambda running well on dev
-        run: echo Invoke AWS Lambda meili-indexer-dev running well
-
   ### User Retention
   deploy-user-retention-dev:
     runs-on: 'ubuntu-latest'
@@ -240,6 +207,262 @@ jobs:
       - name: re-deploy Likecoin likecoin-update-civic-liker-cache Lambda to dev
         run: |
           aws lambda update-function-code --function-name likecoin-update-civic-liker-cache-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-likecoin-batch-update-civic-liker-caches-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name likecoin-batch-update-civic-liker-caches-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-archive-user-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name archive-user-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-articles-indexer-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name articles-indexer-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+          
+  deploy-daily-summary-email-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name daily-summary-email-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-billboard-clear-auction-and-distribute-tax-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name billboard-clear-auction-and-distribute-tax-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-check-nomad-badge-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name check-nomad-badge-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-exchange-rate-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name exchange-rate-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-payment-cancel-timeout-transactions-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name payment-cancel-timeout-transactions-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-qf-calculator-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name qf-calculator-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-refresh-ipns-gw3-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name refresh-ipns-gw3-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-refresh-search-index-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name refresh-search-index-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-refresh-view-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name refresh-view-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-sendmail-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name sendmail-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-sync-audit-log-to-bigquery-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name sync-audit-log-to-bigquery-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-sync-stripe-delivery-failed-events-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name sync-stripe-delivery-failed-events-dev \
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
+
+  deploy-transfer-trial-end-subscriptions-dev:
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    needs: build-and-publish
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: re-deploy Lambda to dev
+        run: |
+          aws lambda update-function-code --function-name transfer-trial-end-subscriptions-dev \
             --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
         env:
           IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
