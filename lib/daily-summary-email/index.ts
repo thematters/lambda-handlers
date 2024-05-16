@@ -7,10 +7,15 @@ export const sendDailySummaryEmails = async () => {
   const notice = new Notice()
   const users = await notice.findDailySummaryUsers()
 
-  const jobs = users.map(async (user, index) => {
-    const notices = await notice.findDailySummaryNoticesByUser(user.id)
+  const jobs = users.map(async (user) => {
+    if (!user.email) {
+      console.log(`User ${user.id} does not have an email address, skipping`)
+      return
+    }
 
+    const notices = await notice.findDailySummaryNoticesByUser(user.id)
     if (!notices || notices.length <= 0) {
+      console.log(`User ${user.id} does not have any notices, skipping`)
       return
     }
 
