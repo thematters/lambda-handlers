@@ -6,8 +6,8 @@ const clientEmail = process.env.MATTERS_GA4_CLIENT_EMAIL
 const privateKey = process.env.MATTERS_GA4_PRIVATE_KEY || ''
 
 const main = async () => {
-  const startDate = '2023-11-21'
-  const endDate = '2023-11-21'
+  const startDate = '2024-05-05'
+  const endDate = '2024-05-13'
   const client = new BetaAnalyticsDataClient({
     projectId,
     credentials: {
@@ -29,12 +29,27 @@ const main = async () => {
       },
     ],
     dimensionFilter: {
-      filter: {
-        fieldName: 'pagePath',
-        stringFilter: {
-          matchType: 'BEGINS_WITH',
-          value: '/@hi176/464031',
-        },
+      orGroup: {
+        expressions: [
+          {
+            filter: {
+              fieldName: 'pagePath',
+              stringFilter: {
+                matchType: 'BEGINS_WITH',
+                value: '/a/',
+              },
+            },
+          },
+          {
+            filter: {
+              fieldName: 'pagePath',
+              stringFilter: {
+                matchType: 'BEGINS_WITH',
+                value: '/@',
+              },
+            },
+          },
+        ],
       },
     },
     metrics: [

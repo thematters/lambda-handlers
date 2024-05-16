@@ -24,7 +24,7 @@ interface MergedData {
 }
 
 export const getLocalDateString = (date: Date) => {
-  // return utc+8 date string in YYYY-MM-DD format
+  // return UTC+8 date string in YYYY-MM-DD format
   return date.toLocaleDateString('sv', { timeZone: 'Asia/Taipei' })
 }
 
@@ -116,28 +116,53 @@ export const convertAndMerge = async (rows: Row[]): Promise<MergedData> => {
   return res
 }
 
-const pathToId = async (path: string) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_, __, articlePath] = path.split('/')
-  if (articlePath) {
-    const parts = articlePath.split('-')
-    const idLike = parts[0]
-    const hash = parts[parts.length - 1]
-    if (/^-?\d+$/.test(idLike)) {
-      return idLike
+export const pathToId = async (path: string) => {
+  if (path.startsWith('/@')) {
+    const [_, __, articlePath] = path.split('/')
+    if (articlePath) {
+      const parts = articlePath.split('-')
+      const idLike = parts[0]
+      const hash = parts[parts.length - 1]
+      if (/^-?\d+$/.test(idLike)) {
+        return idLike
+      } else {
+        return mediaHashToId(hash)
+      }
+    }
+  } else if (path.startsWith('/a/')) {
+    console.log(path)
+    const parts = path.split('/')
+    if (parts.length == 3) {
+      // /a/m4nxkbfhn4vc
+      const shortHash = parts[2]
+      return shortHashToId(shortHash)
     } else {
-      return hashToId(hash)
+      // /a/m4nxkbfhn4vc/edit
+      return null
     }
   }
+  return null
 }
 
-const hashToId = async (hash: string) => {
+const mediaHashToId = async (hash: string) => {
   const res = await knexRO<ArticleVersionDB>('article_version')
     .where({ mediaHash: hash })
     .select('article_id')
     .first()
   if (res) {
     return res.articleId
+  } else {
+    return null
+  }
+}
+
+const shortHashToId = async (hash: string) => {
+  const res = await knexRO<ArticleDB>('article')
+    .where({ shortHash: hash })
+    .select('id')
+    .first()
+  if (res) {
+    return res.id
   } else {
     return null
   }
@@ -172,12 +197,27 @@ const request = async (
       },
     ],
     dimensionFilter: {
-      filter: {
-        fieldName: 'pagePath',
-        stringFilter: {
-          matchType: 'BEGINS_WITH',
-          value: '/@',
-        },
+      orGroup: {
+        expressions: [
+          {
+            filter: {
+              fieldName: 'pagePath',
+              stringFilter: {
+                matchType: 'BEGINS_WITH',
+                value: '/a/',
+              },
+            },
+          },
+          {
+            filter: {
+              fieldName: 'pagePath',
+              stringFilter: {
+                matchType: 'BEGINS_WITH',
+                value: '/@',
+              },
+            },
+          },
+        ],
       },
     },
     metrics: [
