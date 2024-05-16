@@ -304,7 +304,8 @@ const loadArticles = async (
       article.id,
       avn.title,
       u.display_name,
-      avn.media_hash
+      avn.media_hash,
+      article.short_hash
     FROM article 
     INNER JOIN article_version avn
       ON article.id = avn.article_id
