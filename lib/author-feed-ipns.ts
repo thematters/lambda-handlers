@@ -62,7 +62,7 @@ export class AuthorFeed {
     console.log(new Date(), 'loadData got userImg:', this.userImg)
   }
 
-  // mov from articleService.ts
+  // move from articleService.ts
   generate() {
     const { userName, displayName, description } = this.author
 
@@ -109,9 +109,7 @@ export class AuthorFeed {
             content: arti.content,
             // tags: draft.tags || [],
             uri: `./${arti.id}-${slugify(arti.title)}/`,
-            sourceUri: `https://${siteDomain}/@${userName}/${arti.id}-${slugify(
-              arti.title
-            )}/`,
+            sourceUri: `https://${siteDomain}/a/${arti.shortHash}`,
           }
         })
         .filter(Boolean) as any[],
@@ -294,9 +292,7 @@ export class AuthorFeed {
             // tags: draft.tags || [],
             createdAt: arti.createdAt,
             uri: `./${arti.id}-${slugify(arti.title)}/`,
-            sourceUri: `https://${siteDomain}/@${userName}/${arti.id}-${slugify(
-              arti.title
-            )}/`,
+            sourceUri: `https://${siteDomain}/a/${arti.shortHash}`,
           }
         })
         .filter(Boolean) as any[],

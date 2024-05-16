@@ -105,6 +105,7 @@ export interface AuthorArticle {
   summary: string
   content: string
   dataHash: string
+  shortHash: string
   state: string
   tags: string[]
   createdAt: Date
@@ -143,6 +144,7 @@ export interface ArticleToPublish {
   access: string
   state: string
   dataHash: string
+  shortHash: string
   tags: string[]
   updatedAt: Date
   createdAt: Date
@@ -236,7 +238,7 @@ LIMIT ${take} OFFSET ${skip} ;`
   listRecentArticlesToPublish({ userName = '', take = 100, skip = 0 } = {}) {
     return sqlRO<ArticleToPublish[]>`-- list recent articles
 SELECT
-  a.id, avn.id as article_version_id, avn.title, avn.summary, ac.content, avn.data_hash, user_name,
+  a.id, avn.id as article_version_id, avn.title, avn.summary, ac.content, a.short_hash, avn.data_hash, user_name,
   avn.tags, a.state, avn.cover, avn.circle_id, avn.access, a.updated_at, a.created_at
 FROM public.article a
 LEFT JOIN public.article_version_newest avn ON a.id=avn.article_id
@@ -271,7 +273,7 @@ LIMIT ${take} OFFSET ${skip} ;`
   }) {
     return sqlRO<
       AuthorArticle[]
-    >`SELECT a.id, avn.title, avn.summary, ac.content, avn.data_hash, avn.tags, a.created_at
+    >`SELECT a.id, avn.title, avn.summary, ac.content, avn.data_hash, a.short_hash, avn.tags, a.created_at
 FROM public.article a
 LEFT JOIN public.article_version_newest avn ON a.id=avn.article_id
 LEFT JOIN public.article_content ac ON avn.content_id=ac.id
