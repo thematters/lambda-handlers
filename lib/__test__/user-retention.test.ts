@@ -1,6 +1,9 @@
 import type { SendmailFn } from '../user-retention/types'
 import { processUserRetention } from '../user-retention'
-import { loadRecommendedArticles } from '../user-retention/sendmail'
+import {
+  loadRecommendedArticles,
+  loadHottestArticles,
+} from '../user-retention/sendmail'
 import { markUserState, loadUserRetentionState } from '../user-retention/utils'
 import { DAY } from '../constants'
 import { sql } from '../db'
@@ -34,6 +37,11 @@ test('loadRecommendedArticles', async () => {
     '0',
   ])
   expect(articles2.length).toBe(0)
+})
+
+test('loadHottestArticles', async () => {
+  const articles = await loadHottestArticles('2', 3, sql(['0']))
+  expect(articles).toEqual([])
 })
 
 test('loadUserRetentionState', async () => {
