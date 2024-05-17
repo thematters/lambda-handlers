@@ -101,6 +101,7 @@ type Article = {
   title: string
   displayName: string
   mediaHash: string
+  shortHash: string
 }
 
 const loadUserInfo = async (userId: string): Promise<UserInfo> => {
@@ -135,14 +136,15 @@ export const loadRecommendedArticles = async (
   }
 }
 
-const loadHottestArticles = async (
+export const loadHottestArticles = async (
   userId: string,
   limit: number,
   excludedArticleIdsFragment: any
 ): Promise<Article[]> => sql`
-    SELECT h.id, h.title, u.display_name, a.media_hash
+    SELECT h.id, avn.title, u.display_name, avn.media_hash, a.short_hash
     FROM article_hottest_materialized h 
     JOIN article a ON h.id = a.id
+    JOIN article_version_newest avn ON h.id = avn.article_id
     JOIN public.user u ON a.author_id=u.id
     WHERE a.id NOT IN (SELECT article_id FROM article_read_count WHERE user_id=${userId}) AND a.author_id != ${userId}
         AND a.id NOT IN ${excludedArticleIdsFragment}
@@ -302,7 +304,8 @@ const loadArticles = async (
       article.id,
       avn.title,
       u.display_name,
-      avn.media_hash
+      avn.media_hash,
+      article.short_hash
     FROM article 
     INNER JOIN article_version avn
       ON article.id = avn.article_id

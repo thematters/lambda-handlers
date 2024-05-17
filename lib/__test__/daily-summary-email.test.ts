@@ -33,6 +33,7 @@ test('getArticleDigest', async () => {
     slug: 'test-article-1',
     authorId: '1',
     mediaHash: 'someIpfsMediaHash1',
+    shortHash: 'someShortHash1',
   }
   const articleDigest = await getArticleDigest(article)
   expect(articleDigest?.appreciationsReceivedTotal).toBeGreaterThanOrEqual(150)

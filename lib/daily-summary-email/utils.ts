@@ -18,6 +18,7 @@ type ArticlePartial = {
   title: string
   authorId: string
   mediaHash: string
+  shortHash: string
 }
 
 type ArticleVersion = {
@@ -77,6 +78,7 @@ export const getArticleDigest = async (article: ArticlePartial | null) => {
     title: articleVersion?.title,
     slug: encodeURIComponent(slugify(articleVersion?.title ?? '')),
     mediaHash: article.mediaHash,
+    shortHash: article.shortHash,
     appreciationsReceivedTotal,
     responseCount,
   }
@@ -106,7 +108,7 @@ export const getActors = async (actors: UserDigest[]) => {
 const findArticle = async (id: string): Promise<ArticlePartial | null> => {
   const result = await sql<
     ArticlePartial[]
-  >`SELECT article.id, title, author_id, media_hash FROM article join article_version ON article.id = article_version.article_id AND article.id = ${id}`
+  >`SELECT article.id, title, author_id, media_hash, short_hash FROM article join article_version ON article.id = article_version.article_id AND article.id = ${id}`
   if (result.length !== 1) {
     return null
   }

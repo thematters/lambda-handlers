@@ -23,21 +23,15 @@ type NoticeEntityType =
 type NoticeMessage = string
 
 type NoticeData = {
-  // used by official annoncement notices
+  // used by official announcement notices
   url?: string
   // reason for banned/frozen users, not in used
   reason?: string
 
-  // usde by circle new bundled notices
+  // used by circle new bundled notices
   comments?: string[]
   replies?: string[]
   mentions?: string[]
-}
-
-type NoticeEntity = {
-  type: NoticeEntityType
-  table: string
-  entityId: string
 }
 
 type NoticeEntitiesMap = Record<NoticeEntityType, any>

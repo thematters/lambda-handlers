@@ -1,6 +1,9 @@
 import type { SendmailFn } from '../user-retention/types'
 import { processUserRetention } from '../user-retention'
-import { loadRecommendedArticles } from '../user-retention/sendmail'
+import {
+  loadRecommendedArticles,
+  loadHottestArticles,
+} from '../user-retention/sendmail'
 import { markUserState, loadUserRetentionState } from '../user-retention/utils'
 import { DAY } from '../constants'
 import { sql } from '../db'
@@ -20,20 +23,17 @@ test('processUserRetention', async () => {
 
 test('loadRecommendedArticles', async () => {
   const articles = await loadRecommendedArticles('2', getOldDate(), 3, ['0'])
-  // expect(articles).toEqual([
-  //   {
-  //     id: "1",
-  //     title: "test article 1",
-  //     displayName: "test1",
-  //     mediaHash: "someIpfsMediaHash1",
-  //   },
-  // ]);
   expect(articles).toEqual([])
   // null lastSeen return nothing
   const articles2 = await loadRecommendedArticles('2', null as any as Date, 3, [
     '0',
   ])
   expect(articles2.length).toBe(0)
+})
+
+test('loadHottestArticles', async () => {
+  const articles = await loadHottestArticles('2', 3, sql(['0']))
+  expect(articles).toEqual([])
 })
 
 test('loadUserRetentionState', async () => {
