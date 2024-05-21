@@ -3,6 +3,7 @@ import { processUserRetention } from '../user-retention'
 import {
   loadRecommendedArticles,
   loadHottestArticles,
+  loadNewFeatureArticles,
 } from '../user-retention/sendmail'
 import { markUserState, loadUserRetentionState } from '../user-retention/utils'
 import { DAY } from '../constants'
@@ -34,6 +35,11 @@ test('loadRecommendedArticles', async () => {
 test('loadHottestArticles', async () => {
   const articles = await loadHottestArticles('2', 3, sql(['0']))
   expect(articles).toEqual([])
+})
+
+test('loadNewFeatureArticles', async () => {
+  const articles = await loadNewFeatureArticles('1', 1)
+  expect(articles.length).toEqual(1)
 })
 
 test('loadUserRetentionState', async () => {
