@@ -24,16 +24,15 @@ export const sendmail = async (
     )
     return
   }
-  const { displayName, email, language, createdAt, state } = await loadUserInfo(
-    userId
-  )
-  if (!email) {
-    console.warn(`User ${userId} has no email, sendmail quit.`)
+  const { displayName, email, emailVerified, language, createdAt, state } =
+    await loadUserInfo(userId)
+  if (!email || !emailVerified) {
+    console.warn(`User ${userId} has no verified email, sendmail quit.`)
     return
   }
   const goodState = ['onboarding', 'active']
   if (!goodState.includes(state)) {
-    console.warn(`Unexpected user state: ${state},  sendmail quit.`)
+    console.warn(`Unexpected user state: ${state}, sendmail quit.`)
     return
   }
   const subject = getSubject(displayName, type, language)
@@ -85,6 +84,7 @@ export const sendmail = async (
 type UserInfo = {
   displayName: string
   email: string
+  emailVerified: boolean
   language: Language
   createdAt: Date
   state: string
@@ -106,7 +106,7 @@ type Article = {
 
 const loadUserInfo = async (userId: string): Promise<UserInfo> => {
   const res =
-    await sql`select display_name, email, language, created_at, state from public.user where id=${userId}`
+    await sql`select display_name, email, email_verified, language, created_at, state from public.user where id=${userId}`
   return res[0] as UserInfo
 }
 
