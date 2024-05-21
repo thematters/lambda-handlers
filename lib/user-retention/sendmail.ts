@@ -204,17 +204,19 @@ const loadRecommendedUsers = async (
     LIMIT ${limit};
 `
 
-const loadNewFeatureArticles = async (
+export const loadNewFeatureArticles = async (
   tagId: string,
   limit: number
 ): Promise<Article[]> => sql`
     SELECT
       article.id,
-      article.title,
+      avn.title,
       u.display_name,
-      article.media_hash
+      avn.media_hash,
+      article.short_hash
     FROM article_tag
     JOIN article ON article_tag.article_id=article.id
+    JOIN article_version_newest avn ON article.id=avn.article_id
     JOIN public.user u ON article.author_id=u.id
     WHERE tag_id=${tagId}
     ORDER BY article.created_at DESC
