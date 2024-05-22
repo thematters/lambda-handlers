@@ -208,7 +208,7 @@ FROM (
         ? sql`a.id IN ${sql(articleIds)}`
         : range
         ? sql`a.id IN ( ${allRecentChangedArticleIds} UNION ${allRecentReadArticleIds} UNION ${allRecentPublishedArticles} )`
-        : sql`a.state='active' AND draft.publish_state='published'`
+        : sql`a.state='active'`
     }
 ) a
 LEFT JOIN (
