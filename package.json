@@ -39,6 +39,7 @@
     "@aws-sdk/client-sqs": "^3.266.0",
     "@google-analytics/data": "^4.0.1",
     "@google-cloud/bigquery": "^7.3.0",
+    "@mapbox/node-pre-gyp": "^1.0.11",
     "@matters/apollo-response-cache": "^1.4.0-rc.0",
     "@matters/ipns-site-generator": "^0.1.5",
     "@matters/slugify": "^0.7.3",

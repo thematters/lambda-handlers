@@ -22,6 +22,8 @@ RUN yum update -y && \
 WORKDIR /usr/app
 COPY package*.json ./
 RUN npm ci --omit=dev --ignore-scripts
+RUN npm install @mapbox/node-pre-gyp
+RUN npm rebuild --build-from-source opencc
 
 ## the actual run image
 FROM public.ecr.aws/lambda/nodejs:18

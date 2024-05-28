@@ -63,13 +63,17 @@ export async function refreshSearchIndexUser({
           .cursor(BATCH_SIZE)) {
           await Promise.all(
             rows.map(async (row) => {
-              row.userName = row.userName.toLowerCase()
+              row.userName = row.userName?.toLowerCase() || ''
               if (row.displayName) {
                 row.displayNameOrig = row.displayName
                 ;[row.displayName, row.description] = await Promise.all([
-                  converter.convertPromise(row.displayName.toLowerCase()),
+                  converter.convertPromise(
+                    row.displayName?.toLowerCase() || ''
+                  ),
                   row.description &&
-                    converter.convertPromise(row.description.toLowerCase()),
+                    converter.convertPromise(
+                      row.description?.toLowerCase() || ''
+                    ),
                 ])
               }
             })
@@ -215,9 +219,9 @@ export async function refreshSearchIndexTag({
             rows.map(async (row) => {
               row.contentOrig = row.content
               ;[row.content, row.description] = await Promise.all([
-                converter.convertPromise(row.content.toLowerCase()),
-                row.description &&
-                  converter.convertPromise(row.description.toLowerCase()),
+                converter.convertPromise(row.content?.toLowerCase() || ''),
+                // row.description &&
+                converter.convertPromise(row.description?.toLowerCase() || ''),
               ])
             })
           )
@@ -384,9 +388,9 @@ export async function refreshSearchIndexArticle({
         arti.titleOrig = arti.title
         ;[arti.title, arti.summary, arti.textContentConverted] =
           await Promise.all([
-            converter.convertPromise(arti.title.toLowerCase()),
-            converter.convertPromise(arti.summary.toLowerCase()),
-            converter.convertPromise(text.toLowerCase()),
+            converter.convertPromise(arti.title?.toLowerCase() || ''),
+            converter.convertPromise(arti.summary?.toLowerCase() || ''),
+            converter.convertPromise(text?.toLowerCase() || ''),
           ])
         delete arti.content
         debugLog(`article${idx}:`, arti)
