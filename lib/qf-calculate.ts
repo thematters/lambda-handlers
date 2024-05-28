@@ -263,39 +263,22 @@ export async function calculateQFScore({
     ],
   }
 
-  const ipfsArticleHashes = await (isProd // dev-db has migrated article_version, while prod-db not yet; TODO update Prod code to keep consistency
-    ? sqlRO`-- get de-duplicated donation records from darft data_hash
-SELECT article.id ::int, article.title, article.summary, article.created_at,
-  draft.data_hash AS data_hash,
-  article.data_hash AS latest_data_hash,
-  lower(author.eth_address) AS eth_address,
-  author.user_name, author.display_name, author.email, article.author_id ::int,
-  concat(${siteDomain} ::text, '/@', user_name, '/', article.id, '-', article.slug) AS url
-FROM public.draft LEFT JOIN public.article ON article_id=article.id
-LEFT JOIN public.user author ON article.author_id=author.id
-WHERE author.eth_address IS NOT NULL
-  AND draft.data_hash =ANY(${Array.from(seqsByDataHash.keys()).filter(Boolean)})
-ORDER BY article.id DESC ; `
-    : sqlRO`-- get de-duplicated donation records from darft data_hash
-SELECT article.id ::int, title, summary, article_version.created_at, article_version.data_hash,
-  latest_data_hash, -- draft.data_hash AS draft_data_hash,
+  const ipfsArticleHashes =
+    await sqlRO`-- get de-duplicated donation records from darft data_hash
+SELECT article.id ::int, avn.title, avn.summary, article_version.created_at, article_version.data_hash,
+  avn.data_hash AS latest_data_hash, -- draft.data_hash AS draft_data_hash,
   lower(author.eth_address) AS eth_address,
   author.user_name, author.display_name, author.email, article.author_id ::int,
   concat(${siteDomain} ::text, '/a/', article.short_hash) AS url
-FROM public.article_version
-LEFT JOIN public.article ON article_id=article.id
-LEFT JOIN (
-  SELECT DISTINCT ON (article.id) article.id, article_version.data_hash AS latest_data_hash
-  FROM public.article_version
-  LEFT JOIN public.article ON article_id=article.id
-  ORDER BY article.id DESC, article_version.id DESC
-) latest_data_hash ON latest_data_hash.id=article.id
+FROM public.article
+LEFT JOIN public.article_version ON article_version.article_id=article.id
+LEFT JOIN public.article_version_newest avn ON avn.article_id=article.id
 LEFT JOIN public.user author ON article.author_id=author.id
 WHERE author.eth_address IS NOT NULL
   AND article_version.data_hash =ANY(${Array.from(seqsByDataHash.keys()).filter(
     Boolean
   )})
-ORDER BY article.id DESC ; `)
+ORDER BY article.id DESC ; `
 
   const dataHashMappings = d3.group(ipfsArticleHashes, (d) => d.dataHash)
   const dataHashRevisdedMappings = // new Map(
@@ -479,8 +462,7 @@ WHERE lower(u.eth_address) = ANY(${Array.from(stats.toAddresses, (addr) =>
     // console.log(new Date(), 'aggPerFromAddress:', aggPerFromAddress)
     const senderAddresses: string[] = Array.from(aggPerFromAddress.keys()) // all lower cased
 
-    const senders = await (isProd
-      ? sqlRO`-- get all sender's social
+    const senders = await sqlRO`-- get all sender's social
 SELECT sender.user_name, display_name, to_jsonb(sag.*) AS sag, to_jsonb(sat.*) AS sat,
   (sender.avatar IS NOT NULL) AS has_avatar,
   (LENGTH(sender.description) > 0) AS has_description,
@@ -488,7 +470,8 @@ SELECT sender.user_name, display_name, to_jsonb(sag.*) AS sag, to_jsonb(sat.*) A
   sender.created_at AS user_created_at, num_articles, -- num_articles_featured,
   earliest_article_published_at, ub.count AS num_badges, num_followers,
   last_donat.created_at AS earliest_donated_at,
-  last_donat.title, all_donates.titles, last_donat.target_url, -- , last_donat.created_at
+  -- last_donat.title, all_donates.titles, last_donat.target_url, -- , last_donat.created_at
+  last_donat.title, last_donat.target_url,
   num_articles_be_donated, num_donated_authors,
   num_read_articles, num_reading_days, num_comments
 FROM public.user sender
@@ -499,17 +482,11 @@ LEFT JOIN (
   FROM public.article
   GROUP BY 1
 ) articles ON articles.author_id=sender.id
-/* LEFT JOIN ( -- featured articles
-  SELECT author_id, COUNT(article_id) ::int AS num_articles_featured
-  FROM matters_choice
-  LEFT JOIN article ON article_id=article.id
-  GROUP BY 1
-) articles_featured ON articles_featured.author_id=sender.id */
 LEFT JOIN (
-  SELECT DISTINCT ON (sender_id) sender_id ::int, tr.created_at, title,
-    concat(${siteDomain} ::text, '/@', '/', target_id, '-', slug) AS target_url
+  SELECT DISTINCT ON (sender_id) sender_id ::int, tr.created_at, avn.title, concat(${siteDomain} ::text, '/a/', short_hash) AS target_url
   FROM transaction tr
   LEFT JOIN public.article ON target_id=article.id AND target_type=4
+  LEFT JOIN public.article_version_newest avn ON avn.article_id=article.id
   WHERE tr.purpose='donation' AND tr.state='succeeded'
     AND tr.currency='USDT'
     -- AND tr.created_at >= $ {fromTime!}
@@ -517,22 +494,6 @@ LEFT JOIN (
     -- AND target_type=4 -- AND target_id IN ( SELECT id FROM all_applicant_articles )
   ORDER BY sender_id, tr.created_at ASC
 ) last_donat ON last_donat.sender_id=sender.id
-LEFT JOIN (
-  SELECT sender_id ::int, ARRAY_AGG(DISTINCT concat(article.id, '-', article.slug)) AS titles
-    -- concat('https://matters.town/@', '/', target_id, '-', slug) AS target_url
-  FROM (
-    SELECT DISTINCT ON (sender_id, target_id) sender_id, target_id, tr.created_at
-    FROM transaction tr
-    WHERE tr.purpose='donation' AND tr.state='succeeded'
-      AND tr.currency='USDT'
-      AND tr.created_at BETWEEN ${fromTime!} AND ${toTime!}
-      AND target_type=4 -- AND target_id IN ( SELECT id FROM all_applicant_articles )
-    ORDER BY sender_id, target_id, created_at ASC
-  ) t
-  LEFT JOIN public.article ON target_id=article.id
-  GROUP BY 1
-  -- ORDER BY sender_id, tr.created_at ASC
-) all_donates ON all_donates.sender_id=sender.id
 LEFT JOIN (
   SELECT recipient_id, COUNT(DISTINCT target_id) ::int AS num_articles_be_donated
   FROM transaction tr
@@ -576,81 +537,6 @@ LEFT JOIN (
 -- LEFT JOIN public.user_badge ub ON ub.user_id=sender.id AND ub.type='seed' AND ub.enabled
 WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
 -- ORDER BY sender.id DESC ;`
-      : sqlRO`-- get all sender's social
-SELECT sender.user_name, display_name, to_jsonb(sag.*) AS sag, to_jsonb(sat.*) AS sat,
-  (sender.avatar IS NOT NULL) AS has_avatar,
-  (LENGTH(sender.description) > 0) AS has_description,
-  lower(sender.eth_address) AS eth_address,
-  sender.created_at AS user_created_at, num_articles, -- num_articles_featured,
-  earliest_article_published_at, ub.count AS num_badges, num_followers,
-  last_donat.created_at AS earliest_donated_at,
-  -- last_donat.title, all_donates.titles, last_donat.target_url, -- , last_donat.created_at
-  last_donat.title, last_donat.target_url,
-  num_articles_be_donated, num_donated_authors,
-  num_read_articles, num_reading_days, num_comments
-FROM public.user sender
-LEFT JOIN social_account sag ON sag.user_id=sender.id AND sag.type='Google'
-LEFT JOIN social_account sat ON sat.user_id=sender.id AND sag.type='Twitter'
-LEFT JOIN (
-  SELECT author_id, COUNT(*) ::int AS num_articles, MIN(created_at) AS earliest_article_published_at
-  FROM public.article
-  GROUP BY 1
-) articles ON articles.author_id=sender.id
-LEFT JOIN (
-  SELECT DISTINCT ON (sender_id) sender_id ::int, tr.created_at, title, concat(${siteDomain} ::text, '/a/', short_hash) AS target_url
-  FROM transaction tr
-  LEFT JOIN public.article ON target_id=article.id AND target_type=4
-  LEFT JOIN public.article_version ON article_id=article.id
-  WHERE tr.purpose='donation' AND tr.state='succeeded'
-    AND tr.currency='USDT'
-    -- AND tr.created_at >= $ {fromTime!}
-    AND tr.created_at BETWEEN ${fromTime!} AND ${toTime!}
-    -- AND target_type=4 -- AND target_id IN ( SELECT id FROM all_applicant_articles )
-  ORDER BY sender_id, tr.created_at ASC
-) last_donat ON last_donat.sender_id=sender.id
-LEFT JOIN (
-  SELECT recipient_id, COUNT(DISTINCT target_id) ::int AS num_articles_be_donated
-  FROM transaction tr
-  WHERE tr.purpose='donation' AND tr.state='succeeded'
-    -- AND tr.created_at BETWEEN $ {fromTime!} AND $ {toTime!}
-    AND target_type=4 -- AND target_id IN ( SELECT id FROM all_applicant_articles )
-  GROUP BY 1
-) all_donated ON all_donated.recipient_id=sender.id
-LEFT JOIN (
-  SELECT sender_id, COUNT(DISTINCT recipient_id) ::int AS num_donated_authors
-  FROM transaction tr
-  WHERE tr.purpose='donation' AND tr.state='succeeded'
-    -- AND tr.created_at BETWEEN $ {fromTime!} AND $ {toTime!}
-    AND target_type=4 -- AND target_id IN ( SELECT id FROM all_applicant_articles )
-  GROUP BY 1
-) all_donated_senders ON all_donated_senders.sender_id=sender.id
-LEFT JOIN (
-  SELECT user_id,
-    COUNT(DISTINCT article_id) ::int AS num_read_articles,
-    COUNT(DISTINCT created_at ::date) ::int AS num_reading_days
-  FROM article_read_count
-  WHERE user_id IS NOT NULL
-  GROUP BY 1
-) reading_actvs ON reading_actvs.user_id=sender.id
-LEFT JOIN (
-  SELECT author_id, COUNT(*) ::int AS num_comments
-  FROM public.comment
-  GROUP BY 1
-) comments ON comments.author_id=sender.id
-LEFT JOIN (
-  SELECT target_id, COUNT(*) ::int AS num_followers
-  FROM public.action_user
-  GROUP BY 1
-) actions ON actions.target_id=sender.id
-LEFT JOIN (
-  SELECT user_id, COUNT(*) ::int
-  FROM public.user_badge
-  WHERE enabled
-  GROUP BY 1
-) ub ON ub.user_id=sender.id
--- LEFT JOIN public.user_badge ub ON ub.user_id=sender.id AND ub.type='seed' AND ub.enabled
-WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
--- ORDER BY sender.id DESC ;`)
 
     const sendersMap = new Map(senders.map((u) => [u.ethAddress, u]))
 
@@ -662,10 +548,10 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
         ethAddress: k,
         trustPoints: 0.0,
         sumDonations: v.sum,
-        hasAvatar: senderObj?.hasAvatar,
-        hasDescription: senderObj?.hasDescription,
-        hasGoogleAccount: !!senderObj?.sag?.email, // check is valid
-        hasTwitterAccount: !!senderObj?.sat?.userName, // check twitter history length;
+        hasAvatar: senderObj?.hasAvatar || undefined,
+        hasDescription: senderObj?.hasDescription || undefined,
+        hasGoogleAccount: !!senderObj?.sag?.email || undefined, // check is valid
+        hasTwitterAccount: !!senderObj?.sat?.userName || undefined, // check twitter history length;
         numBadges: senderObj?.numBadges,
         numArticles: senderObj?.numArticles,
         numArticlesFeatured: senderObj?.numArticlesFeatured,
@@ -760,12 +646,11 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
       ) as bigint,
       // number_donations
       count_contributions: g.length,
-      number_contribution_addresses: new Set(g.map((d) => d.from)).size,
+      count_contribution_addresses: new Set(g.map((d) => d.from)).size,
       // .sort( d3.ascending // (a, b) => a == null || b == null ? NaN : a < b ? -1 : a > b ? 1 : a >= b ? 0 : NaN , // https://github.com/d3/d3-array/blob/main/src/ascending.js
       sum: g.reduce((acc, b) => acc + b.amount, 0n),
     }),
-    (d) =>
-      (dataHashMappings.get(d.dataHash)?.[0]?.dataHash ?? d.dataHash) || d.uri // d.dataHash || d.uri
+    (d) => dataHashMappings.get(d.dataHash)?.[0]?.latestDataHash ?? d.dataHash // || d.uri // d.dataHash || d.uri
   )
   // console.log('for seqs contrib:', aggPerProj)
 
@@ -775,9 +660,8 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
       amounts: g.map((d) => d.amount),
       sum: g.reduce((acc, b) => acc + b.amount, 0n), // d3.sum(g, (d) => d.amount),
     }),
-    (d) =>
-      // dataHashMappings.has(d.dataHash)
-      (dataHashMappings.get(d.dataHash)?.[0]?.dataHash ?? d.dataHash) || d.uri,
+    (d) => dataHashMappings.get(d.dataHash)?.[0]?.latestDataHash ?? d.dataHash, // || d.uri // d.dataHash || d.uri
+    // (d) => // dataHashMappings.has(d.dataHash) // (dataHashMappings.get(d.dataHash)?.[0]?.dataHash ?? d.dataHash) || d.uri,
     (d) => d.from
   )
 
@@ -824,8 +708,9 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
         id: proj,
         title: dataHashAttributes?.[0]?.title,
         count_contributions: aggPerProj.get(proj)?.count_contributions,
-        number_contribution_addresses:
-          aggPerProj.get(proj)?.number_contribution_addresses,
+        count_contributions_merged: aggPerProjFrom.get(proj)?.size,
+        count_contribution_addresses:
+          aggPerProj.get(proj)?.count_contribution_addresses,
         contribution_amount: aggPerProj.get(proj)?.sum,
         shares,
         clr_amount_pairw,
@@ -985,40 +870,6 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
   // (3)
   console.log(`Merkle Root with ${treeValues.length} entries:`, tree.root)
 
-  gist.files['README.md'].content = `${runningBetween},
-
-\`\`\`js
-// from Optimism onChain:
-${util.inspect(
-  statsSummary, // replacer
-  { compact: false }
-  // (_, v) => (typeof v === 'bigint' ? +Number(v) : v),
-  // 2
-)}
-
-// from MattersDB:
-${util.inspect(
-  {
-    numIPFSCids: ipfsArticleHashes.length,
-    ...usdtDonationsStats,
-  },
-  { compact: false }
-)}
-
-// for Distribute
-${util.inspect(
-  {
-    amountTotal, // : util.format('%i', amountTotal),
-    sharesTotal,
-  },
-  { compact: false }
-)}
-\`\`\`
-
-Merkle Tree Root (with ${treeValues.length} entries): \`${tree.root}\`
-
-this is analyzing results with [Quadratic Funding score calcuation with Pairwise Mechanism](https://github.com/gitcoinco/quadratic-funding?tab=readme-ov-file#implementation-upgrade-the-pairwise-mechanism)`
-
   // (4) // write out to somewhere S3 bucket?
   // fs.writeFileSync("out/tree.json", JSON.stringify(tree.dump(), null, 2));
   // console.log("Merkle-Tree Dump:", JSON.stringify(tree.dump(), null, 2));
@@ -1102,6 +953,41 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
         .join(',\n') +
       ' ]',
   }
+
+  gist.files['README.md'].content = `${runningBetween},
+
+\`\`\`js
+// from Optimism onChain:
+${util.inspect(
+  Object.assign(
+    statsSummary, // replacer
+    {
+      // for Distribute
+      cidsCount: new Set(Array.from(treeValues, (d) => d[0])).size,
+      authorsCount: new Set(Array.from(treeValues, (d) => d[1])).size,
+      amountTotal,
+      sharesTotal: d3.sum(Array.from(treeValues, (d) => d[2])),
+    }
+  ),
+  { compact: false }
+  // (_, v) => (typeof v === 'bigint' ? +Number(v) : v),
+  // 2
+)}
+
+// from MattersDB:
+${util.inspect(
+  Object.assign(usdtDonationsStats, {
+    numIPFSCids: dataHashMappings.size, // ipfsArticleHashes.length,
+    numIPFSCidsMerged: dataHashRevisdedMappings.size,
+    // ...usdtDonationsStats,
+  }),
+  { compact: false }
+)}
+\`\`\`
+
+Merkle Tree Root (with ${treeValues.length} entries): \`${tree.root}\`
+
+this is analyzing results with [Quadratic Funding score calcuation with Pairwise Mechanism](https://github.com/gitcoinco/quadratic-funding?tab=readme-ov-file#implementation-upgrade-the-pairwise-mechanism)`
 
   let gist_url: string | undefined = undefined
   // skip if no GITHUB_TOKEN

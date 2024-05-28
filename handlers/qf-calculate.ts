@@ -199,8 +199,8 @@ export const handler = async (
       (await calculateQFScore({
         // fromTime, toTime,
         fromBlock: BigInt(fromBlock),
-        toBlock: BigInt(toBlock),
-        amountTotal: BigInt(+(amountTotal || 10_000)),
+        toBlock: toBlock ? BigInt(toBlock) : undefined,
+        amountTotal: BigInt(+(amountTotal || 201_600_000)), // 500e6 * 3.6% * 14days * 80%
         finalize: !!finalize,
       })) || {}
     if (!root) {
