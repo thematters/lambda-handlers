@@ -221,7 +221,8 @@ export class LikeCoin {
       },
     })
     const data = result?.data
-    if (data === 'OK') {
+    // filter CANNOT_SELF_LIKE error, self-like is allowed in Matters
+    if (data === 'OK' || data === 'CANNOT_SELF_LIKE') {
       return data
     } else {
       throw result
