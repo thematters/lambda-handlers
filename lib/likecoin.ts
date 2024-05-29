@@ -82,8 +82,13 @@ export class LikeCoin {
   }
 
   like = async (data: LikeData) => {
-    const { likerId, url } = data
+    const { likerId, url, authorLikerId } = data
     const liker = await this.findLiker({ likerId })
+
+    if (likerId === authorLikerId) {
+      console.log('cannot like self, skip.')
+      return
+    }
 
     if (!liker) {
       throw new Error(`liker (${likerId}) not found.`)
@@ -221,8 +226,7 @@ export class LikeCoin {
       },
     })
     const data = result?.data
-    // filter CANNOT_SELF_LIKE error, self-like is allowed in Matters
-    if (data === 'OK' || data === 'CANNOT_SELF_LIKE') {
+    if (data === 'OK') {
       return data
     } else {
       throw result
