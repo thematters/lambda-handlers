@@ -28,6 +28,12 @@ export const deleteDrafts = async (authorId: string) => {
   )
 }
 
+export const archiveJournal = async (authorId: string) => {
+  await knex('journal')
+    .where('authorId', authorId)
+    .update({ state: 'archived' })
+}
+
 export const deleteUnpulishedArticles = async (authorId: string) =>
   knex('article')
     .where({ authorId })
