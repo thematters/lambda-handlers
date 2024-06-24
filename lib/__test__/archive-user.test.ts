@@ -47,6 +47,12 @@ test('archive users having data', async () => {
     .whereIn('state', [ARTICLE_STATE.error, ARTICLE_STATE.pending])
     .count()
   expect(unpublishedArticleCount).toBe('0')
+
+  // journal archived
+  const journals = await knex('journal').where({ authorId: user.id })
+  for (const journal of journals) {
+    expect(journal.state).toBe('archived')
+  }
 })
 
 // helpers
@@ -64,6 +70,12 @@ const createArchiveUserData = async ({ hasData }: { hasData: boolean }) => {
       state: USER_STATE.archived,
     })
     .returning('id')
+
+  await knex('journal').insert({
+    author_id: user.id,
+    state: 'active',
+    content: 'test journal content',
+  })
 
   const [
     { id: profileCoverId },
