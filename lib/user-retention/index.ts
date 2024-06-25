@@ -56,7 +56,7 @@ const markNewUsers = async () => {
 }
 
 const markActiveUsers = async () => {
-  // active users from exsited users
+  // active users from existed users
   console.time('markActiveUsers1')
   await sql`
     INSERT INTO user_retention_history (user_id, state)
@@ -126,7 +126,8 @@ const fetchUsersData = async () => {
       user_retention.created_at as state_updated_at,
       last_seen
     FROM user_retention, public.user
-    WHERE user_retention.user_id = public.user.id;`
+    WHERE user_retention.user_id = public.user.id
+    	AND public.user.state = 'active';`
 }
 
 //processUserRetention({intervalInDays: 0}).then(()=>{process.exit()})
