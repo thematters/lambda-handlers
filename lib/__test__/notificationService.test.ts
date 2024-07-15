@@ -170,3 +170,13 @@ describe('bundle notices', () => {
     expect(unbundleableNotice).toBeUndefined()
   })
 })
+
+describe('find users', () => {
+  test('findDailySummaryUsers', async () => {
+    const users = await notificationService.findDailySummaryUsers()
+    expect(users.length).toBeGreaterThanOrEqual(1)
+  })
+  test('findDailySummaryNoticesByUser', async () => {
+    await notificationService.findDailySummaryNoticesByUser('1')
+  })
+})
