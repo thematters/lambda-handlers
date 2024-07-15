@@ -1,10 +1,13 @@
-import { DB_NOTICE_TYPE } from './enum.js'
-import type { DBNoticeType } from './notice'
-import { Notice } from './notice.js'
+import type { Knex } from 'knex'
+import type { NotificationType } from '../notification/types.js'
+
 import { sendmail } from './sendmail.js'
 
-export const sendDailySummaryEmails = async () => {
-  const notice = new Notice()
+import { NOTICE_TYPE } from '../notification/enums.js'
+import { NotificationService } from '../notification/index.js'
+
+export const sendDailySummaryEmails = async (knex: Knex) => {
+  const notice = new NotificationService(knex, knex)
   const users = await notice.findDailySummaryUsers()
 
   const jobs = users.map(async (user) => {
@@ -21,7 +24,7 @@ export const sendDailySummaryEmails = async () => {
       return
     }
 
-    const filterNotices = (type: DBNoticeType) =>
+    const filterNotices = (type: NotificationType) =>
       notices.filter((notice) => notice.noticeType === type)
 
     await sendmail({
@@ -30,43 +33,35 @@ export const sendDailySummaryEmails = async () => {
         displayName: user.displayName,
       },
       notices: {
-        user_new_follower: filterNotices(DB_NOTICE_TYPE.user_new_follower),
-        article_new_collected: filterNotices(
-          DB_NOTICE_TYPE.article_new_collected
-        ),
+        user_new_follower: filterNotices(NOTICE_TYPE.user_new_follower),
+        article_new_collected: filterNotices(NOTICE_TYPE.article_new_collected),
         article_new_appreciation: filterNotices(
-          DB_NOTICE_TYPE.article_new_appreciation
+          NOTICE_TYPE.article_new_appreciation
         ),
         article_new_subscriber: filterNotices(
-          DB_NOTICE_TYPE.article_new_subscriber
+          NOTICE_TYPE.article_new_subscriber
         ),
-        article_new_comment: filterNotices(DB_NOTICE_TYPE.article_new_comment),
-        article_mentioned_you: filterNotices(
-          DB_NOTICE_TYPE.article_mentioned_you
-        ),
-        comment_new_reply: filterNotices(DB_NOTICE_TYPE.comment_new_reply),
+        article_new_comment: filterNotices(NOTICE_TYPE.article_new_comment),
+        article_mentioned_you: filterNotices(NOTICE_TYPE.article_mentioned_you),
+        comment_new_reply: filterNotices(NOTICE_TYPE.comment_new_reply),
         comment_mentioned_you: filterNotices(
-          DB_NOTICE_TYPE.comment_mentioned_you
+          NOTICE_TYPE.article_comment_mentioned_you
         ),
 
         // circle
-        circle_invitation: filterNotices(DB_NOTICE_TYPE.circle_invitation),
-        circle_new_subscriber: filterNotices(
-          DB_NOTICE_TYPE.circle_new_subscriber
-        ),
-        circle_new_follower: filterNotices(DB_NOTICE_TYPE.circle_new_follower),
+        circle_invitation: filterNotices(NOTICE_TYPE.circle_invitation),
+        circle_new_subscriber: filterNotices(NOTICE_TYPE.circle_new_subscriber),
+        circle_new_follower: filterNotices(NOTICE_TYPE.circle_new_follower),
         circle_new_unsubscriber: filterNotices(
-          DB_NOTICE_TYPE.circle_new_unsubscriber
+          NOTICE_TYPE.circle_new_unsubscriber
         ),
-        circle_new_article: filterNotices(DB_NOTICE_TYPE.circle_new_article),
-        circle_new_broadcast: filterNotices(
-          DB_NOTICE_TYPE.circle_new_broadcast
-        ),
+        circle_new_article: filterNotices(NOTICE_TYPE.circle_new_article),
+        circle_new_broadcast: filterNotices(NOTICE_TYPE.circle_new_broadcast),
         circle_new_broadcast_comments: filterNotices(
-          DB_NOTICE_TYPE.circle_new_broadcast_comments
+          NOTICE_TYPE.circle_new_broadcast_comments
         ),
         circle_new_discussion_comments: filterNotices(
-          DB_NOTICE_TYPE.circle_new_discussion_comments
+          NOTICE_TYPE.circle_new_discussion_comments
         ),
       },
       language: user.language,
