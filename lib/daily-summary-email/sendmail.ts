@@ -35,7 +35,7 @@ export const sendmail = async ({
     article_new_comment: NoticeItem[]
     article_mentioned_you: NoticeItem[]
     comment_new_reply: NoticeItem[]
-    comment_mentioned_you: NoticeItem[]
+    article_comment_mentioned_you: NoticeItem[]
 
     circle_invitation: NoticeItem[]
 
@@ -94,10 +94,12 @@ export const sendmail = async ({
     }))
   )
   const comment_mentioned_you = await Promise.all(
-    notices.comment_mentioned_you.map(async ({ actors = [], entities }) => ({
-      actor: await getUserDigest(actors[0]),
-      comment: await getCommentDigest(entities && entities.target),
-    }))
+    notices.article_comment_mentioned_you.map(
+      async ({ actors = [], entities }) => ({
+        actor: await getUserDigest(actors[0]),
+        comment: await getCommentDigest(entities && entities.target),
+      })
+    )
   )
   const circle_new_subscriber = await Promise.all(
     notices.circle_new_subscriber.map(async ({ actors = [], entities }) => ({

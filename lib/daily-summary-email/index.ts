@@ -44,7 +44,7 @@ export const sendDailySummaryEmails = async (knex: Knex) => {
         article_new_comment: filterNotices(NOTICE_TYPE.article_new_comment),
         article_mentioned_you: filterNotices(NOTICE_TYPE.article_mentioned_you),
         comment_new_reply: filterNotices(NOTICE_TYPE.comment_new_reply),
-        comment_mentioned_you: filterNotices(
+        article_comment_mentioned_you: filterNotices(
           NOTICE_TYPE.article_comment_mentioned_you
         ),
 
