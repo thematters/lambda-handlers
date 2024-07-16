@@ -263,7 +263,7 @@ interface NoticeCircleNewUnsubscriberParams extends NotificationRequiredParams {
 
 interface NoticeCircleNewBroadcastCommentsParams
   extends NotificationRequiredParams {
-  event: BundledNoticeType
+  event: BUNDLED_NOTICE_TYPE
   recipientId: string
   actorId: string
   entities: [NotificationEntity<'target', 'circle'>]
@@ -272,7 +272,7 @@ interface NoticeCircleNewBroadcastCommentsParams
 
 interface NoticeCircleNewDiscussionCommentsParams
   extends NotificationRequiredParams {
-  event: BundledNoticeType
+  event: BUNDLED_NOTICE_TYPE
   recipientId: string
   actorId: string
   entities: [NotificationEntity<'target', 'circle'>]
@@ -334,6 +334,18 @@ interface NoticeCommentReportedParams extends NotificationRequiredParams {
   recipientId: string
 }
 
+interface NoticeWriteChallengeAppliedParams extends NotificationRequiredParams {
+  event: OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_applied
+  recipientId: string
+  entities: [NotificationEntity<'target', 'campaign'>]
+  data: { link: string }
+}
+
+interface NoticeBadgeGrandSlamAwardedParams extends NotificationRequiredParams {
+  event: OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded
+  recipientId: string
+}
+
 export type NotificationParams =
   // User
   | NoticeUserNewFollowerParams
@@ -378,6 +390,8 @@ export type NotificationParams =
   | NoticeArticleBannedParams
   | NoticeArticleReportedParams
   | NoticeCommentReportedParams
+  | NoticeWriteChallengeAppliedParams
+  | NoticeBadgeGrandSlamAwardedParams
 
 export type NoticeUserId = string
 

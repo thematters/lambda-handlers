@@ -31,3 +31,4 @@ export type TableName =
   | 'moment'
   | 'transaction'
   | 'circle'
+  | 'campaign'

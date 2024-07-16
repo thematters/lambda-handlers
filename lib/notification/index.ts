@@ -27,7 +27,7 @@ import {
   USER_ACTION,
 } from './enums.js'
 
-import trans from './translations.js'
+import trans, { findTranslation } from './translations.js'
 import { loadLatestArticleVersion } from './utils.js'
 
 const mergeDataCustomizer = (objValue: any, srcValue: any) => {
@@ -541,6 +541,8 @@ export class NotificationService {
       article_banned: true,
       comment_reported: true,
       article_reported: true,
+      write_challenge_applied: true,
+      badge_grand_slam_awarded: true,
     }
 
     return noticeSettingMap[event]
@@ -712,8 +714,37 @@ export class NotificationService {
           }),
           entities: params.entities,
         }
+      case OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_applied:
+        return {
+          type: NOTICE_TYPE.official_announcement,
+          recipientId: params.recipientId,
+          message: trans.user_unbanned(language, {
+            name:
+              (await findTranslation(
+                {
+                  table: 'campaign',
+                  field: 'name',
+                  id: params.entities[0].entity.id,
+                  language,
+                },
+                this.knexRO
+              )) ?? params.entities[0].entity.name,
+          }),
+          data: params.data,
+        }
+      case OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded:
+        return {
+          type: NOTICE_TYPE.official_announcement,
+          recipientId: params.recipientId,
+          message: trans.badge_grand_slam_awarded(language, {}),
+          data: {
+            link: 'https://matters.town/placeholder/',
+          },
+        }
       default:
-        return
+        // for exhaustively handle enum values,
+        // see https://medium.com/typescript-tidbits/exhaustively-handle-enum-values-in-switch-case-at-compile-time-abf6cf1a42b7
+        shouldBeUnreachable(params)
     }
   }
   private findNotifySetting = async (userId: string) =>
@@ -799,3 +830,6 @@ export class NotificationService {
     return uniqNotices
   }
 }
+
+const shouldBeUnreachable = (value: never) =>
+  console.log(`unhandle value: ${value}`)
