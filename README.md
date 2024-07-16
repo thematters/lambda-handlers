@@ -16,6 +16,7 @@ feat(lambda): multiple lambda handlers in one repo
 - [x] sync-ga4-data
 - [x] archive-user
 - [x] daily-summary-email
+- [x] notification
 
 ## Dependencies
 
