@@ -48,81 +48,7 @@ export class NotificationService {
     this.knex = knex
   }
 
-  /**
-   * Create a notice item
-   */
-  public async create({
-    type,
-    actorId,
-    recipientId,
-    entities,
-    message,
-    data,
-  }: PutNoticeParams): Promise<void> {
-    await this.knex.transaction(async (trx) => {
-      // create notice detail
-      const [{ id: noticeDetailId }] = await trx
-        .insert({
-          noticeType: type,
-          message,
-          data,
-        })
-        .into('notice_detail')
-        .returning('*')
-
-      // create notice
-      const [{ id: noticeId }] = await trx
-        .insert({
-          uuid: v4(),
-          noticeDetailId,
-          recipientId,
-        })
-        .into('notice')
-        .returning('*')
-
-      // create notice actorId
-      if (actorId) {
-        await trx
-          .insert({
-            noticeId,
-            actorId,
-          })
-          .into('notice_actor')
-          .returning('*')
-      }
-
-      // create notice entities
-      if (entities) {
-        await Promise.all(
-          entities.map(
-            async ({
-              type: entityType,
-              entityTable,
-              entity,
-            }: NotificationEntity) => {
-              const { id: entityTypeId } = await trx
-                .select('id')
-                .from('entity_type')
-                .where({ table: entityTable })
-                .first()
-              await trx
-                .insert({
-                  type: entityType,
-                  entityTypeId,
-                  entityId: entity.id,
-                  noticeId,
-                })
-                .into('notice_entity')
-                .returning('*')
-            }
-          )
-        )
-      }
-    })
-  }
-
   public async trigger(params: NotificationParams) {
-    //const recipient = await atomService.userIdLoader.load(params.recipientId)
     const recipient = await this.knexRO('user')
       .where({ id: params.recipientId })
       .first()
@@ -281,6 +207,79 @@ export class NotificationService {
       await this.create(params)
       return { created: true, bundled: false }
     }
+  }
+
+  /**
+   * Create a notice item
+   */
+  private async create({
+    type,
+    actorId,
+    recipientId,
+    entities,
+    message,
+    data,
+  }: PutNoticeParams): Promise<void> {
+    await this.knex.transaction(async (trx) => {
+      // create notice detail
+      const [{ id: noticeDetailId }] = await trx
+        .insert({
+          noticeType: type,
+          message,
+          data,
+        })
+        .into('notice_detail')
+        .returning('*')
+
+      // create notice
+      const [{ id: noticeId }] = await trx
+        .insert({
+          uuid: v4(),
+          noticeDetailId,
+          recipientId,
+        })
+        .into('notice')
+        .returning('*')
+
+      // create notice actorId
+      if (actorId) {
+        await trx
+          .insert({
+            noticeId,
+            actorId,
+          })
+          .into('notice_actor')
+          .returning('*')
+      }
+
+      // create notice entities
+      if (entities) {
+        await Promise.all(
+          entities.map(
+            async ({
+              type: entityType,
+              entityTable,
+              entity,
+            }: NotificationEntity) => {
+              const { id: entityTypeId } = await trx
+                .select('id')
+                .from('entity_type')
+                .where({ table: entityTable })
+                .first()
+              await trx
+                .insert({
+                  type: entityType,
+                  entityTypeId,
+                  entityId: entity.id,
+                  noticeId,
+                })
+                .into('notice_entity')
+                .returning('*')
+            }
+          )
+        )
+      }
+    })
   }
 
   /**
