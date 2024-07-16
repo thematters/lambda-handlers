@@ -7,7 +7,7 @@ import { NOTICE_TYPE } from '../notification/enums.js'
 import { NotificationService } from '../notification/index.js'
 
 export const sendDailySummaryEmails = async (knex: Knex) => {
-  const notice = new NotificationService(knex, knex)
+  const notice = new NotificationService({ knex, knexRO: knex })
   const users = await notice.findDailySummaryUsers()
 
   const jobs = users.map(async (user) => {

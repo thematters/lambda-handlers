@@ -16,7 +16,7 @@ const recipientId = '1'
 
 beforeAll(async () => {
   knex = getKnexClient(process.env.MATTERS_PG_RO_CONNECTION_STRING || '')
-  notificationService = new NotificationService(knex, knex)
+  notificationService = new NotificationService({ knex, knexRO: knex })
 })
 
 /**

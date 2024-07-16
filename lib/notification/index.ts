@@ -43,9 +43,9 @@ export class NotificationService {
   private knex: Knex
   private knexRO: Knex
 
-  public constructor(knex: Knex, knexRO: Knex) {
-    this.knex = knex
+  public constructor({ knexRO, knex }: { knexRO: Knex; knex: Knex }) {
     this.knexRO = knexRO
+    this.knex = knex ?? knexRO
   }
 
   /**
