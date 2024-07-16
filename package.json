@@ -1,6 +1,6 @@
 {
   "name": "lambda-handlers-image",
-  "version": "0.8.14",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "scripts": {
