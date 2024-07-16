@@ -3,7 +3,6 @@ import {
   getArticleDigest,
   getCommentDigest,
 } from '../daily-summary-email/utils'
-import { Notice } from '../daily-summary-email/notice'
 
 test('getUserDigest', async () => {
   const user = {
@@ -48,16 +47,4 @@ test('getCommentDigest', async () => {
   }
   const commentDigest = await getCommentDigest(comment)
   expect(commentDigest?.article).not.toBeUndefined()
-})
-
-describe('notice', () => {
-  test('findDailySummaryUsers', async () => {
-    const notice = new Notice()
-    const users = await notice.findDailySummaryUsers()
-    expect(users.length).toBeGreaterThanOrEqual(1)
-  })
-  test('findDailySummaryNoticesByUser', async () => {
-    const notice = new Notice()
-    await notice.findDailySummaryNoticesByUser('1')
-  })
 })

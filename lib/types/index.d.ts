@@ -23,3 +23,11 @@ export type User = {
 }
 
 export type Language = 'zh_hant' | 'zh_hans' | 'en'
+
+export type TableName =
+  | 'user'
+  | 'comment'
+  | 'article'
+  | 'moment'
+  | 'transaction'
+  | 'circle'

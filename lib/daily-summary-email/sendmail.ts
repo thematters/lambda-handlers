@@ -1,10 +1,9 @@
 import type { Language } from '../types'
-import type { DBNoticeType } from './notice'
+import type { NoticeItem } from '../notification/types'
 
-import { DB_NOTICE_TYPE } from './enum.js'
-import { Mail } from '../../lib/mail.js'
-import { EMAIL_FROM_ASK } from '../../lib/constants/index.js'
-import { NoticeItem } from './notice.js'
+import { NOTICE_TYPE } from '../notification/enums.js'
+import { Mail } from '../mail.js'
+import { EMAIL_FROM_ASK } from '../constants/index.js'
 import {
   getUserDigest,
   getArticleDigest,
@@ -36,7 +35,7 @@ export const sendmail = async ({
     article_new_comment: NoticeItem[]
     article_mentioned_you: NoticeItem[]
     comment_new_reply: NoticeItem[]
-    comment_mentioned_you: NoticeItem[]
+    article_comment_mentioned_you: NoticeItem[]
 
     circle_invitation: NoticeItem[]
 
@@ -95,10 +94,12 @@ export const sendmail = async ({
     }))
   )
   const comment_mentioned_you = await Promise.all(
-    notices.comment_mentioned_you.map(async ({ actors = [], entities }) => ({
-      actor: await getUserDigest(actors[0]),
-      comment: await getCommentDigest(entities && entities.target),
-    }))
+    notices.article_comment_mentioned_you.map(
+      async ({ actors = [], entities }) => ({
+        actor: await getUserDigest(actors[0]),
+        comment: await getCommentDigest(entities && entities.target),
+      })
+    )
   )
   const circle_new_subscriber = await Promise.all(
     notices.circle_new_subscriber.map(async ({ actors = [], entities }) => ({
@@ -153,15 +154,15 @@ export const sendmail = async ({
           section: {
             follow: !!notices.user_new_follower[0],
             article: [
-              DB_NOTICE_TYPE.article_new_collected,
-              DB_NOTICE_TYPE.article_new_appreciation,
-              DB_NOTICE_TYPE.article_new_subscriber,
-              DB_NOTICE_TYPE.article_new_comment,
+              NOTICE_TYPE.article_new_collected,
+              NOTICE_TYPE.article_new_appreciation,
+              NOTICE_TYPE.article_new_subscriber,
+              NOTICE_TYPE.article_new_comment,
             ].some((type: string) => (notices as any)[type][0]),
             mention: [
-              DB_NOTICE_TYPE.article_mentioned_you,
-              DB_NOTICE_TYPE.comment_mentioned_you,
-              DB_NOTICE_TYPE.comment_new_reply,
+              NOTICE_TYPE.article_mentioned_you,
+              NOTICE_TYPE.article_comment_mentioned_you,
+              NOTICE_TYPE.comment_new_reply,
             ].some((type: string) => (notices as any)[type][0]),
           },
           notices: {
