@@ -1,6 +1,28 @@
+import type { Knex } from 'knex'
+import type { Language, TableName } from '../types'
 import { makeSummary } from '@matters/ipns-site-generator'
 
 import { i18n } from './utils.js'
+
+export const findTranslation = async (
+  {
+    table,
+    field,
+    id,
+    language,
+  }: { table: TableName; field: string; id: string; language: Language },
+  knex: Knex
+) => {
+  const { id: entityTypeId } = await knex('entity_type')
+    .select('id')
+    .where({ table })
+    .first()
+  const result = await knex('translation')
+    .select('text')
+    .where({ entityTypeId, entityField: field, entityId: id, language })
+    .first()
+  return result ? result.text : null
+}
 
 export default {
   user_banned: i18n<{ banDays?: number }>({
@@ -66,5 +88,18 @@ export default {
     zh_hans: ({ title }) => `您的作品《${title}}》被举报`,
     en: ({ title }) =>
       `Your article "${title}" has been reported by other users`,
+  }),
+  write_challenge_applied: i18n<{ name: string }>({
+    zh_hant: ({ name }) =>
+      `你已成功報名${name}，前往查看更多資訊、結交馬特市文友`,
+    zh_hans: ({ name }) =>
+      `你已成功报名${name}，前往查看更多资讯、结交马特市文友`,
+    en: ({ name }) =>
+      `You have successfully applied for ${name}. Go to check out more information and make friends in Matters.`,
+  }),
+  badge_grand_slam_awarded: i18n({
+    zh_hant: '太棒了！恭喜獲得七日書大滿貫，快去看看你的新徽章',
+    zh_hans: '太棒了！恭喜获得七日书大满贯，快去看看你的新徽章',
+    en: 'Marvelous! Congratulations on winning the Seven-Day Free Writing Grand Slam, go check out your new badge.',
   }),
 }

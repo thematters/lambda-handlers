@@ -86,6 +86,8 @@ describe('user notify setting', () => {
     article_banned: true,
     comment_reported: true,
     article_reported: true,
+    write_challenge_applied: true,
+    badge_grand_slam_awarded: true,
   }
 
   test('user receives notifications', async () => {
@@ -178,5 +180,30 @@ describe('find users', () => {
   })
   test('findDailySummaryNoticesByUser', async () => {
     await notificationService.findDailySummaryNoticesByUser('1')
+  })
+})
+
+describe('trigger notifications', () => {
+  test('trigger `write_challenge_applied` notice', async () => {
+    // not throw error
+    await notificationService.trigger({
+      event: OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_applied,
+      recipientId: '1',
+      entities: [
+        {
+          type: 'target',
+          entityTable: 'campaign',
+          entity: { id: '1', name: 'test' },
+        },
+      ],
+      data: { link: 'https://example.com' },
+    })
+  })
+  test('trigger `badge_grand_slam_awarded` notice', async () => {
+    // not throw error
+    await notificationService.trigger({
+      event: OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded,
+      recipientId: '1',
+    })
   })
 })
