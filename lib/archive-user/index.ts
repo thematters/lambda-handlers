@@ -4,7 +4,7 @@ import {
   getUserState,
   deleteDrafts,
   deleteUnpulishedArticles,
-  archiveJournal,
+  archiveMoment,
   deleteUserAssets,
 } from './utils.js'
 
@@ -20,8 +20,8 @@ export const archiveUser = async (userId: string) => {
   // delete not active articles
   await deleteUnpulishedArticles(userId)
 
-  // archive journal
-  await archiveJournal(userId)
+  // archive Moment
+  await archiveMoment(userId)
 
   // delete user assets
   await deleteUserAssets(userId)

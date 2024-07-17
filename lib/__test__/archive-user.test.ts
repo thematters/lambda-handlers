@@ -48,10 +48,10 @@ test('archive users having data', async () => {
     .count()
   expect(unpublishedArticleCount).toBe('0')
 
-  // journal archived
-  const journals = await knex('journal').where({ authorId: user.id })
-  for (const journal of journals) {
-    expect(journal.state).toBe('archived')
+  // moment archived
+  const moments = await knex('moment').where({ authorId: user.id })
+  for (const moment of moments) {
+    expect(moment.state).toBe('archived')
   }
 })
 
@@ -71,10 +71,10 @@ const createArchiveUserData = async ({ hasData }: { hasData: boolean }) => {
     })
     .returning('id')
 
-  await knex('journal').insert({
+  await knex('moment').insert({
     author_id: user.id,
     state: 'active',
-    content: 'test journal content',
+    content: 'test moment content',
   })
 
   const [
