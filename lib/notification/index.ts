@@ -718,7 +718,7 @@ export class NotificationService {
         return {
           type: NOTICE_TYPE.official_announcement,
           recipientId: params.recipientId,
-          message: trans.user_unbanned(language, {
+          message: trans.write_challenge_applied(language, {
             name:
               (await findTranslation(
                 {
