@@ -15,9 +15,9 @@ import type {
 import type { Language, User } from '../types'
 
 import uniqBy from 'lodash.uniqby'
+import { isEqual, mergeWith, uniq } from 'lodash'
 
 import { DAY } from '../constants/index.js'
-import { isArray, isEqual, mergeWith, uniq } from 'lodash'
 import { v4 } from 'uuid'
 
 import {
@@ -31,7 +31,7 @@ import trans, { findTranslation } from './translations.js'
 import { loadLatestArticleVersion } from './utils.js'
 
 const mergeDataCustomizer = (objValue: any, srcValue: any) => {
-  if (isArray(objValue)) {
+  if (Array.isArray(objValue)) {
     return uniq(objValue.concat(srcValue))
   }
 }
