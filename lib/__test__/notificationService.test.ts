@@ -3,6 +3,7 @@ import type { NotificationType } from '../notification/types'
 
 import { NOTICE_TYPE, OFFICIAL_NOTICE_EXTEND_TYPE } from '../notification/enums'
 import { NotificationService } from '../notification'
+import { mergeDataWith } from '../notification/utils'
 import { getKnexClient } from '../utils/db'
 
 let knex: Knex
@@ -19,9 +20,12 @@ beforeAll(async () => {
   notificationService = new NotificationService({ knex, knexRO: knex })
 })
 
-/**
- * Notification Service
- */
+// utils
+test('mergeDataWith', () => {
+  expect(mergeDataWith({ a: [1, 2] }, { a: [2, 3] })).toEqual({ a: [1, 2, 3] })
+})
+
+// service
 describe('user notify setting', () => {
   const defaultNoifySetting: Record<NotificationType, boolean> = {
     // user

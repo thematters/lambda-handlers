@@ -15,9 +15,9 @@ import type {
 import type { Language, User } from '../types'
 
 import uniqBy from 'lodash.uniqby'
+import lodash from 'lodash'
 
 import { DAY } from '../constants/index.js'
-import { isArray, isEqual, mergeWith, uniq } from 'lodash'
 import { v4 } from 'uuid'
 
 import {
@@ -27,17 +27,10 @@ import {
   USER_ACTION,
 } from './enums.js'
 
+const { isEqual } = lodash
+
 import trans, { findTranslation } from './translations.js'
-import { loadLatestArticleVersion } from './utils.js'
-
-const mergeDataCustomizer = (objValue: any, srcValue: any) => {
-  if (isArray(objValue)) {
-    return uniq(objValue.concat(srcValue))
-  }
-}
-
-const mergeDataWith = (objValue: any, srcValue: any) =>
-  mergeWith(objValue, srcValue, mergeDataCustomizer)
+import { loadLatestArticleVersion, mergeDataWith } from './utils.js'
 
 export class NotificationService {
   private knex: Knex
