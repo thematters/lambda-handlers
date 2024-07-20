@@ -15,7 +15,7 @@ import type {
 import type { Language, User } from '../types'
 
 import uniqBy from 'lodash.uniqby'
-import { isEqual } from 'lodash'
+import lodash from 'lodash'
 
 import { DAY } from '../constants/index.js'
 import { v4 } from 'uuid'
@@ -26,6 +26,8 @@ import {
   OFFICIAL_NOTICE_EXTEND_TYPE,
   USER_ACTION,
 } from './enums.js'
+
+const { isEqual } = lodash
 
 import trans, { findTranslation } from './translations.js'
 import { loadLatestArticleVersion, mergeDataWith } from './utils.js'

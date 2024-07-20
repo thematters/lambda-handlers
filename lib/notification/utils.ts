@@ -1,7 +1,9 @@
 import type { Language } from '../types'
 import type { Knex } from 'knex'
 
-import { mergeWith, uniq } from 'lodash'
+import lodash from 'lodash'
+
+const { mergeWith, uniq } = lodash
 
 const mergeDataCustomizer = (objValue: any, srcValue: any) => {
   if (Array.isArray(objValue)) {
