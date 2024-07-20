@@ -1,6 +1,17 @@
 import type { Language } from '../types'
 import type { Knex } from 'knex'
 
+import { mergeWith, uniq } from 'lodash'
+
+const mergeDataCustomizer = (objValue: any, srcValue: any) => {
+  if (Array.isArray(objValue)) {
+    return uniq(objValue.concat(srcValue))
+  }
+}
+
+export const mergeDataWith = (objValue: any, srcValue: any) =>
+  mergeWith(objValue, srcValue, mergeDataCustomizer)
+
 export const loadLatestArticleVersion = async (articleId: string, knex: Knex) =>
   knex('article_version_newest').where('articleId', articleId).first()
 
