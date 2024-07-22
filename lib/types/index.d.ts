@@ -28,6 +28,7 @@ export type TableName =
   | 'user'
   | 'comment'
   | 'article'
+  | 'collection'
   | 'moment'
   | 'transaction'
   | 'circle'

@@ -40,6 +40,9 @@ describe('user notify setting', () => {
     revised_article_not_published: true,
     circle_new_article: true,
 
+    // collection
+    collection_liked: true,
+
     // moment
     moment_liked: true,
     moment_mentioned_you: true,
@@ -189,7 +192,7 @@ describe('find users', () => {
 
 describe('trigger notifications', () => {
   test('trigger `write_challenge_applied` notice', async () => {
-    // not throw error
+    // no error
     await notificationService.trigger({
       event: OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_applied,
       recipientId: '1',
@@ -204,10 +207,25 @@ describe('trigger notifications', () => {
     })
   })
   test('trigger `badge_grand_slam_awarded` notice', async () => {
-    // not throw error
+    // no error
     await notificationService.trigger({
       event: OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded,
       recipientId: '1',
+    })
+  })
+  test('trigger `collection_liked` notice', async () => {
+    // no error
+    await notificationService.trigger({
+      event: NOTICE_TYPE.collection_liked,
+      actorId: '1',
+      recipientId: '1',
+      entities: [
+        {
+          type: 'target',
+          entityTable: 'collection',
+          entity: { id: '1' },
+        },
+      ],
     })
   })
 })
