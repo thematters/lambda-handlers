@@ -484,6 +484,9 @@ export class NotificationService {
       // article-article
       article_new_collected: setting.articleNewCollected,
 
+      // collection
+      collection_liked: setting.newLike,
+
       // moment
       moment_liked: setting.newLike,
       moment_mentioned_you: setting.mention,
@@ -585,6 +588,7 @@ export class NotificationService {
         }
       case NOTICE_TYPE.article_new_comment:
       case NOTICE_TYPE.article_comment_liked:
+      case NOTICE_TYPE.collection_liked:
       case NOTICE_TYPE.moment_new_comment:
       case NOTICE_TYPE.moment_mentioned_you:
       case NOTICE_TYPE.moment_comment_mentioned_you:
