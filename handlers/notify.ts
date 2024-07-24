@@ -2,6 +2,11 @@ import { SQSEvent } from 'aws-lambda'
 import { getKnexClient } from '../lib/utils/db.js'
 import { NotificationService } from '../lib/notification/index.js'
 
+// envs
+// MATTERS_DOMAIN
+// MATTERS_PG_CONNECTION_STRING
+// MATTERS_PG_RO_CONNECTION_STRING
+
 const knex = getKnexClient(process.env.MATTERS_PG_CONNECTION_STRING || '')
 const knexRO = getKnexClient(process.env.MATTERS_PG_RO_CONNECTION_STRING || '')
 
@@ -14,7 +19,7 @@ export const handler = async (event: SQSEvent) => {
       notificationService.trigger(JSON.parse(body))
     )
   )
-  // print failed reseaon
+  // print failed reason
   results.map((res) => {
     if (res.status === 'rejected') {
       console.error(res.reason)

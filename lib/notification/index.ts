@@ -729,15 +729,21 @@ export class NotificationService {
           }),
           data: params.data,
         }
-      case OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded:
+      case OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded: {
+        const recipient = await this.knexRO('user')
+          .select('user_name')
+          .where({ id: params.recipientId })
+          .first()
+        const domain = process.env.MATTERS_DOMAIN ?? 'matters.town'
         return {
           type: NOTICE_TYPE.official_announcement,
           recipientId: params.recipientId,
           message: trans.badge_grand_slam_awarded(language, {}),
           data: {
-            link: 'https://matters.town/placeholder/',
+            link: `https://${domain}/@${recipient.userName}?dialog=grand-badge&step=congrats`,
           },
         }
+      }
       default:
         // for exhaustively handle enum values,
         // see https://medium.com/typescript-tidbits/exhaustively-handle-enum-values-in-switch-case-at-compile-time-abf6cf1a42b7
