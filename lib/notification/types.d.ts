@@ -172,7 +172,7 @@ interface NoticeMomentNewCommentParams extends NotificationRequiredParams {
   recipientId: string
   actorId: string
   entities: [
-    NotificationEntity<'target', 'article'>,
+    NotificationEntity<'target', 'moment'>,
     NotificationEntity<'comment', 'comment'>
   ]
 }
@@ -444,12 +444,10 @@ export type NoticeItem = NoticeDetail & {
   entities?: NoticeEntitiesMap
 }
 
-export interface PutNoticeParams {
+type BasePutParams = {
   type: BaseNoticeType
-  actorId?: NoticeUserId | null
-  recipientId: NoticeUserId
   entities?: NotificationEntity[]
-  message?: NoticeMessage | null
+  actorId?: NoticeUserId | null
   data?: NoticeData | null
 
   resend?: boolean // used by circle invitation notice
@@ -458,6 +456,16 @@ export interface PutNoticeParams {
     disabled?: boolean
     mergeData?: boolean // used by circle bundled notice
   }
+}
+
+export type PutNoticesParams = BasePutParams & {
+  recipientIds: NoticeUserId[]
+  messages?: NoticeMessage[] | null
+}
+
+export type PutNoticeParams = BasePutParams & {
+  recipientId: NoticeUserId
+  message?: NoticeMessage | null
 }
 
 // DB schema
