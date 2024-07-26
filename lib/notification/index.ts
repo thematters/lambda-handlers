@@ -726,20 +726,7 @@ export class NotificationService {
         return {
           type: NOTICE_TYPE.official_announcement,
           recipientIds: [params.recipientId],
-          messages: [
-            trans.write_challenge_applied(recipient.language, {
-              name:
-                (await findTranslation(
-                  {
-                    table: 'campaign',
-                    field: 'name',
-                    id: params.entities[0].entity.id,
-                    language: recipient.language,
-                  },
-                  this.knexRO
-                )) ?? params.entities[0].entity.name,
-            }),
-          ],
+          messages: [trans.write_challenge_applied(recipient.language, {})],
           data: params.data,
         }
       case OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded: {
