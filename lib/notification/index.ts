@@ -13,7 +13,7 @@ import type {
   NotificationParams,
   UserNotifySettingDB,
 } from './types'
-import type { User } from '../types'
+import type { User, Language } from '../types'
 
 import uniqBy from 'lodash.uniqby'
 import lodash from 'lodash'
@@ -30,7 +30,7 @@ import {
 
 const { isEqual } = lodash
 
-import trans, { findTranslation } from './translations.js'
+import trans from './translations.js'
 import { loadLatestArticleVersion, mergeDataWith } from './utils.js'
 
 export class NotificationService {
@@ -98,7 +98,7 @@ export class NotificationService {
       })
 
       if (!created && !bundled) {
-        console.info(`Notice ${params.event} to ${params.recipientId} skipped`)
+        console.info(`Notice ${params.event} to ${recipientId} skipped`)
         continue
       }
     }
@@ -535,6 +535,7 @@ export class NotificationService {
       article_reported: true,
       write_challenge_applied: true,
       badge_grand_slam_awarded: true,
+      write_challenge_announcement: true,
     }
 
     return noticeSettingMap[event]
@@ -543,11 +544,12 @@ export class NotificationService {
   private getNoticeParams = async (
     params: NotificationParams
   ): Promise<PutNoticesParams | undefined> => {
-    const recipient = params.recipientId
-      ? await this.knexRO('user').where({ id: params.recipientId }).first()
-      : null
+    const recipient =
+      'recipientId' in params
+        ? await this.knexRO('user').where({ id: params.recipientId }).first()
+        : null
 
-    if (params.recipientId && !recipient) {
+    if ('recipientId' in params && !recipient) {
       console.warn(`recipient ${params.recipientId} not found, skipped`)
       return
     }
@@ -741,6 +743,25 @@ export class NotificationService {
           messages: [trans.badge_grand_slam_awarded(recipient.language, {})],
           data: {
             link: `https://${domain}/@${recipient.userName}?dialog=grand-badge&step=congrats`,
+          },
+        }
+      }
+      case OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_announcement: {
+        const recipients = await this.knexRO('user')
+          .select('user.*')
+          .join('campaign_user', 'user.id', 'campaign_user.user_id')
+          .where({
+            'campaign_user.campaign_id': params.data.campaignId,
+            'campaign_user.state': 'succeeded',
+          })
+        return {
+          type: NOTICE_TYPE.official_announcement,
+          recipientIds: recipients.map((r) => r.id),
+          messages: recipients.map(
+            ({ language }) => params.data.messages[language as Language]
+          ),
+          data: {
+            link: params.data.link,
           },
         }
       }

@@ -1,9 +1,11 @@
+import type { TableName, User, Language } from '../types'
+
 import {
   NOTICE_TYPE,
   BUNDLED_NOTICE_TYPE,
   OFFICIAL_NOTICE_EXTEND_TYPE,
+  LANGUAGES,
 } from './enums'
-import { TableName, User } from '../types'
 
 type BaseNoticeType = keyof typeof NOTICE_TYPE
 
@@ -29,7 +31,6 @@ export type NotificationType =
 
 interface NotificationRequiredParams {
   event: NotificationType
-  recipientId: string
 }
 
 interface NotificationEntity<
@@ -356,6 +357,12 @@ interface NoticeBadgeGrandSlamAwardedParams extends NotificationRequiredParams {
   recipientId: string
 }
 
+interface NoticeWriteChallengeAnnouncementParams
+  extends NotificationRequiredParams {
+  event: OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_announcement
+  data: { link: string; campaignId: string; messages: Record<Language, string> }
+}
+
 export type NotificationParams =
   // User
   | NoticeUserNewFollowerParams
@@ -404,6 +411,7 @@ export type NotificationParams =
   | NoticeCommentReportedParams
   | NoticeWriteChallengeAppliedParams
   | NoticeBadgeGrandSlamAwardedParams
+  | NoticeWriteChallengeAnnouncementParams
 
 export type NoticeUserId = string
 

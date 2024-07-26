@@ -95,6 +95,7 @@ describe('user notify setting', () => {
     article_reported: true,
     write_challenge_applied: true,
     badge_grand_slam_awarded: true,
+    write_challenge_announcement: true,
   }
 
   test('user receives notifications', async () => {
@@ -207,14 +208,14 @@ describe('trigger notifications', () => {
     })
   })
   test('trigger `badge_grand_slam_awarded` notice', async () => {
-    // no error
+    // no errors
     await notificationService.trigger({
       event: OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded,
       recipientId: '1',
     })
   })
   test('trigger `collection_liked` notice', async () => {
-    // no error
+    // no errors
     await notificationService.trigger({
       event: NOTICE_TYPE.collection_liked,
       actorId: '1',
@@ -226,6 +227,36 @@ describe('trigger notifications', () => {
           entity: { id: '1' },
         },
       ],
+    })
+  })
+  test('trigger `write_challenge_announcement` notice', async () => {
+    const [{ id: campaignId }] = await knex('campaign')
+      .insert({
+        type: 'writing_challenge',
+        creatorId: '1',
+        name: 'test',
+        description: 'test',
+        state: 'active',
+        shortHash: 'test-notice-hash',
+      })
+      .returning('id')
+    await knex('campaign_user').insert({
+      campaignId,
+      userId: '1',
+      state: 'succeeded',
+    })
+    // no errors
+    await notificationService.trigger({
+      event: OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_announcement,
+      data: {
+        link: 'https://example.com',
+        campaignId,
+        messages: {
+          zh_hant: 'zh-Hant message',
+          zh_hans: 'zh-Hans message',
+          en: 'en message',
+        },
+      },
     })
   })
 })
