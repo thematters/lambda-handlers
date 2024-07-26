@@ -9,10 +9,11 @@ import type {
   NotificationEntity,
   NotificationType,
   PutNoticeParams,
+  PutNoticesParams,
   NotificationParams,
   UserNotifySettingDB,
 } from './types'
-import type { Language, User } from '../types'
+import type { User, Language } from '../types'
 
 import uniqBy from 'lodash.uniqby'
 import lodash from 'lodash'
@@ -29,7 +30,7 @@ import {
 
 const { isEqual } = lodash
 
-import trans, { findTranslation } from './translations.js'
+import trans from './translations.js'
 import { loadLatestArticleVersion, mergeDataWith } from './utils.js'
 
 export class NotificationService {
@@ -42,69 +43,64 @@ export class NotificationService {
   }
 
   public async trigger(params: NotificationParams) {
-    const recipient = await this.knexRO('user')
-      .where({ id: params.recipientId })
-      .first()
-
-    if (!recipient) {
-      console.warn(`recipient ${params.recipientId} not found, skipped`)
-      return
-    }
-
-    const noticeParams = await this.getNoticeParams(params, recipient.language)
+    const noticeParams = await this.getNoticeParams(params)
 
     if (!noticeParams) {
       return
     }
 
-    // skip if actor === recipient
-    if ('actorId' in params && params.actorId === params.recipientId) {
-      console.warn(
-        `Actor ${params.actorId} is same as recipient ${params.recipientId}, skipped`
-      )
-      return
-    }
-
-    // skip if user disable notify
-    const notifySetting = await this.findNotifySetting(recipient.id)
-    const enable = await this.checkUserNotifySetting({
-      event: params.event,
-      setting: notifySetting,
-    })
-
-    if (!enable) {
-      console.info(
-        `Send ${noticeParams.type} to ${noticeParams.recipientId} skipped`
-      )
-      return
-    }
-
-    // skip if sender is blocked by recipient
-    if ('actorId' in params && params.actorId) {
-      const blocked = await this.knexRO
-        .select()
-        .from('action_user')
-        .where({
-          userId: recipient.id,
-          targetId: params.actorId,
-          action: USER_ACTION.block,
-        })
-        .first()
-
-      if (blocked) {
-        console.info(
-          `Actor ${params.actorId} is blocked by recipient ${params.recipientId}, skipped`
+    for (const [index, recipientId] of noticeParams.recipientIds.entries()) {
+      // skip if actor === recipient
+      if ('actorId' in params && params.actorId === recipientId) {
+        console.warn(
+          `Actor ${params.actorId} is same as recipient ${recipientId}, skipped`
         )
-        return
+        continue
       }
-    }
 
-    // Put Notice to DB
-    const { created, bundled } = await this.process(noticeParams)
+      // skip if user disable notify
+      const notifySetting = await this.findNotifySetting(recipientId)
+      const enable = await this.checkUserNotifySetting({
+        event: params.event,
+        setting: notifySetting,
+      })
 
-    if (!created && !bundled) {
-      console.info(`Notice ${params.event} to ${params.recipientId} skipped`)
-      return
+      if (!enable) {
+        console.info(`Send ${noticeParams.type} to ${recipientId} skipped`)
+        continue
+      }
+
+      // skip if sender is blocked by recipient
+      if ('actorId' in params && params.actorId) {
+        const blocked = await this.knexRO
+          .select()
+          .from('action_user')
+          .where({
+            userId: recipientId,
+            targetId: params.actorId,
+            action: USER_ACTION.block,
+          })
+          .first()
+
+        if (blocked) {
+          console.info(
+            `Actor ${params.actorId} is blocked by recipient ${recipientId}, skipped`
+          )
+          continue
+        }
+      }
+
+      // Put Notice to DB
+      const { created, bundled } = await this.process({
+        ...noticeParams,
+        recipientId,
+        message: noticeParams.messages ? noticeParams.messages[index] : null,
+      })
+
+      if (!created && !bundled) {
+        console.info(`Notice ${params.event} to ${recipientId} skipped`)
+        continue
+      }
     }
   }
 
@@ -539,21 +535,30 @@ export class NotificationService {
       article_reported: true,
       write_challenge_applied: true,
       badge_grand_slam_awarded: true,
+      write_challenge_announcement: true,
     }
 
     return noticeSettingMap[event]
   }
 
   private getNoticeParams = async (
-    params: NotificationParams,
-    language: Language
-  ): Promise<PutNoticeParams | undefined> => {
+    params: NotificationParams
+  ): Promise<PutNoticesParams | undefined> => {
+    const recipient =
+      'recipientId' in params
+        ? await this.knexRO('user').where({ id: params.recipientId }).first()
+        : null
+
+    if ('recipientId' in params && !recipient) {
+      console.warn(`recipient ${params.recipientId} not found, skipped`)
+      return
+    }
     switch (params.event) {
       // entity-free
       case NOTICE_TYPE.user_new_follower:
         return {
           type: params.event,
-          recipientId: params.recipientId,
+          recipientIds: [recipient.id],
           actorId: params.actorId,
         }
       // system as the actor
@@ -563,7 +568,7 @@ export class NotificationService {
       case NOTICE_TYPE.circle_new_article: // deprecated
         return {
           type: params.event,
-          recipientId: params.recipientId,
+          recipientIds: [params.recipientId],
           entities: params.entities,
         }
       // single actor with one or more entities
@@ -582,7 +587,7 @@ export class NotificationService {
       case NOTICE_TYPE.moment_comment_liked:
         return {
           type: params.event,
-          recipientId: params.recipientId,
+          recipientIds: [params.recipientId],
           actorId: params.actorId,
           entities: params.entities,
         }
@@ -594,7 +599,7 @@ export class NotificationService {
       case NOTICE_TYPE.moment_comment_mentioned_you:
         return {
           type: params.event,
-          recipientId: params.recipientId,
+          recipientIds: [params.recipientId],
           actorId: params.actorId,
           entities: params.entities,
           bundle: { disabled: true },
@@ -602,7 +607,7 @@ export class NotificationService {
       case NOTICE_TYPE.circle_invitation:
         return {
           type: params.event,
-          recipientId: params.recipientId,
+          recipientIds: [params.recipientId],
           actorId: params.actorId,
           entities: params.entities,
           resend: true,
@@ -613,7 +618,7 @@ export class NotificationService {
       case BUNDLED_NOTICE_TYPE.in_circle_new_broadcast_reply:
         return {
           type: NOTICE_TYPE.circle_new_broadcast_comments,
-          recipientId: params.recipientId,
+          recipientIds: [params.recipientId],
           actorId: params.actorId,
           entities: params.entities,
           data: params.data, // update latest comment to DB `data` field
@@ -627,7 +632,7 @@ export class NotificationService {
       case BUNDLED_NOTICE_TYPE.in_circle_new_discussion_reply:
         return {
           type: NOTICE_TYPE.circle_new_discussion_comments,
-          recipientId: params.recipientId,
+          recipientIds: [params.recipientId],
           actorId: params.actorId,
           entities: params.entities,
           data: params.data, // update latest comment to DB `data` field
@@ -637,96 +642,93 @@ export class NotificationService {
       case NOTICE_TYPE.official_announcement:
         return {
           type: NOTICE_TYPE.official_announcement,
-          recipientId: params.recipientId,
-          message: params.message,
+          recipientIds: [params.recipientId],
+          messages: [params.message],
           data: params.data,
         }
       case OFFICIAL_NOTICE_EXTEND_TYPE.user_banned:
         return {
           type: NOTICE_TYPE.official_announcement,
-          recipientId: params.recipientId,
-          message: trans.user_banned(language, {}),
+          recipientIds: [params.recipientId],
+          messages: [trans.user_banned(recipient.language, {})],
         }
       case OFFICIAL_NOTICE_EXTEND_TYPE.user_banned_payment:
         return {
           type: NOTICE_TYPE.official_announcement,
-          recipientId: params.recipientId,
-          message: trans.user_banned_payment(language, {}),
+          recipientIds: [params.recipientId],
+          messages: [trans.user_banned_payment(recipient.language, {})],
         }
       case OFFICIAL_NOTICE_EXTEND_TYPE.user_frozen:
         return {
           type: NOTICE_TYPE.official_announcement,
-          recipientId: params.recipientId,
-          message: trans.user_frozen(language, {}),
+          recipientIds: [params.recipientId],
+          messages: [trans.user_frozen(recipient.language, {})],
         }
       case OFFICIAL_NOTICE_EXTEND_TYPE.user_unbanned:
         return {
           type: NOTICE_TYPE.official_announcement,
-          recipientId: params.recipientId,
-          message: trans.user_unbanned(language, {}),
+          recipientIds: [params.recipientId],
+          messages: [trans.user_unbanned(recipient.language, {})],
         }
       case OFFICIAL_NOTICE_EXTEND_TYPE.comment_banned:
         return {
           type: NOTICE_TYPE.official_announcement,
-          recipientId: params.recipientId,
-          message: trans.comment_banned(language, {
-            content: params.entities[0].entity.content,
-          }),
+          recipientIds: [params.recipientId],
+          messages: [
+            trans.comment_banned(recipient.language, {
+              content: params.entities[0].entity.content,
+            }),
+          ],
           entities: params.entities,
         }
       case OFFICIAL_NOTICE_EXTEND_TYPE.article_banned:
         return {
           type: NOTICE_TYPE.official_announcement,
-          recipientId: params.recipientId,
-          message: trans.article_banned(language, {
-            title: (
-              await loadLatestArticleVersion(
-                params.entities[0].entity.id,
-                this.knexRO
-              )
-            ).title,
-          }),
+          recipientIds: [params.recipientId],
+          messages: [
+            trans.article_banned(recipient.language, {
+              title: (
+                await loadLatestArticleVersion(
+                  params.entities[0].entity.id,
+                  this.knexRO
+                )
+              ).title,
+            }),
+          ],
           entities: params.entities,
         }
       case OFFICIAL_NOTICE_EXTEND_TYPE.comment_reported:
         return {
           type: NOTICE_TYPE.official_announcement,
-          recipientId: params.recipientId,
-          message: trans.comment_reported(language, {
-            content: params.entities[0].entity.content,
-          }),
+          recipientIds: [params.recipientId],
+          messages: [
+            trans.comment_reported(recipient.language, {
+              content: params.entities[0].entity.content,
+            }),
+          ],
           entities: params.entities,
         }
       case OFFICIAL_NOTICE_EXTEND_TYPE.article_reported:
         return {
           type: NOTICE_TYPE.official_announcement,
-          recipientId: params.recipientId,
-          message: trans.article_reported(language, {
-            title: (
-              await loadLatestArticleVersion(
-                params.entities[0].entity.id,
-                this.knexRO
-              )
-            ).title,
-          }),
+          recipientIds: [params.recipientId],
+          messages: [
+            trans.article_reported(recipient.language, {
+              title: (
+                await loadLatestArticleVersion(
+                  params.entities[0].entity.id,
+                  this.knexRO
+                )
+              ).title,
+            }),
+          ],
           entities: params.entities,
         }
       case OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_applied:
         return {
           type: NOTICE_TYPE.official_announcement,
-          recipientId: params.recipientId,
-          message: trans.write_challenge_applied(language, {
-            name:
-              (await findTranslation(
-                {
-                  table: 'campaign',
-                  field: 'name',
-                  id: params.entities[0].entity.id,
-                  language,
-                },
-                this.knexRO
-              )) ?? params.entities[0].entity.name,
-          }),
+          recipientIds: [params.recipientId],
+          messages: [trans.write_challenge_applied(recipient.language, {})],
           data: params.data,
         }
       case OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded: {
@@ -737,10 +739,29 @@ export class NotificationService {
         const domain = process.env.MATTERS_DOMAIN ?? 'matters.town'
         return {
           type: NOTICE_TYPE.official_announcement,
-          recipientId: params.recipientId,
-          message: trans.badge_grand_slam_awarded(language, {}),
+          recipientIds: [params.recipientId],
+          messages: [trans.badge_grand_slam_awarded(recipient.language, {})],
           data: {
             link: `https://${domain}/@${recipient.userName}?dialog=grand-badge&step=congrats`,
+          },
+        }
+      }
+      case OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_announcement: {
+        const recipients = await this.knexRO('user')
+          .select('user.*')
+          .join('campaign_user', 'user.id', 'campaign_user.user_id')
+          .where({
+            'campaign_user.campaign_id': params.data.campaignId,
+            'campaign_user.state': 'succeeded',
+          })
+        return {
+          type: NOTICE_TYPE.official_announcement,
+          recipientIds: recipients.map((r) => r.id),
+          messages: recipients.map(
+            ({ language }) => params.data.messages[language as Language]
+          ),
+          data: {
+            link: params.data.link,
           },
         }
       }

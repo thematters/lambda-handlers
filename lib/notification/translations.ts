@@ -89,17 +89,14 @@ export default {
     en: ({ title }) =>
       `Your article "${title}" has been reported by other users`,
   }),
-  write_challenge_applied: i18n<{ name: string }>({
-    zh_hant: ({ name }) =>
-      `你已成功報名${name}，前往查看更多資訊、結交馬特市文友`,
-    zh_hans: ({ name }) =>
-      `你已成功报名${name}，前往查看更多资讯、结交马特市文友`,
-    en: ({ name }) =>
-      `You have successfully applied for ${name}. Go to check out more information and make friends in Matters.`,
+  write_challenge_applied: i18n({
+    zh_hant: `你已成功報名七日書，點此閱讀公告查看詳情，了解如何發文、完成七天寫作`,
+    zh_hans: `你已成功报名七日书，点此阅读公告查看详情，了解如何发文、完成七天写作`,
+    en: `Your Free Write in 7 days application has been submitted successfully. Click here to read the announcement in detail and learn how to publish an article and complete the activity`,
   }),
   badge_grand_slam_awarded: i18n({
     zh_hant: '太棒了！恭喜獲得七日書大滿貫，快去看看你的新徽章',
     zh_hans: '太棒了！恭喜获得七日书大满贯，快去看看你的新徽章',
-    en: 'Marvelous! Congratulations on winning the Seven-Day Free Writing Grand Slam, go check out your new badge.',
+    en: 'Marvelous! Congratulations on winning the Seven-Day Free Writing Grand Slam, go check out your new badge',
   }),
 }
