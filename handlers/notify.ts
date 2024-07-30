@@ -15,7 +15,7 @@ const redis = new Redis(redisPort, redisHost)
 
 const notificationService = new NotificationService({ knex, knexRO })
 
-const DEDUPLICATION_CACHE_EXPIRE = 60 // 1 minutes
+const DEDUPLICATION_CACHE_EXPIRE = 60 * 10 // 10 minutes
 
 export const handler = async (event: SQSEvent) => {
   const results = await Promise.allSettled(
