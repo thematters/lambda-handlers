@@ -30,8 +30,8 @@ export const handler = async (event: SQSEvent) => {
         }
       }
       // deduplication: skip if notice exists
-      const noticeHash = genMD5(body)
-      if (await redis.exists(noticeHash)) {
+      const noticeHashKey = 'notice:' + genMD5(body)
+      if (await redis.exists(noticeHashKey)) {
         console.info(`Notice duplicated, skipped`)
         return
       }
@@ -39,7 +39,7 @@ export const handler = async (event: SQSEvent) => {
       await notificationService.trigger(params)
 
       // deduplication: set notice hash
-      await redis.set(noticeHash, 1, 'EX', DEDUPLICATION_CACHE_EXPIRE)
+      await redis.set(noticeHashKey, 1, 'EX', DEDUPLICATION_CACHE_EXPIRE)
     })
   )
   // print failed reason
