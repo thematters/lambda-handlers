@@ -46,9 +46,10 @@ export class NotificationService {
     const noticeParams = await this.getNoticeParams(params)
 
     if (!noticeParams) {
-      return
+      return []
     }
 
+    const notices = []
     for (const [index, recipientId] of noticeParams.recipientIds.entries()) {
       // skip if actor === recipient
       if ('actorId' in params && params.actorId === recipientId) {
@@ -91,7 +92,7 @@ export class NotificationService {
       }
 
       // Put Notice to DB
-      const { created, bundled } = await this.process({
+      const { created, bundled, notice } = await this.process({
         ...noticeParams,
         recipientId,
         message: noticeParams.messages ? noticeParams.messages[index] : null,
@@ -101,7 +102,10 @@ export class NotificationService {
         console.info(`Notice ${params.event} to ${recipientId} skipped`)
         continue
       }
+
+      notices.push(notice)
     }
+    return notices
   }
 
   public async findActors(
@@ -168,10 +172,14 @@ export class NotificationService {
    */
   private process = async (
     params: PutNoticeParams
-  ): Promise<{ created: boolean; bundled: boolean }> => {
+  ): Promise<{
+    created: boolean
+    bundled: boolean
+    notice: { id: string }
+  }> => {
     if (params.bundle?.disabled === true) {
-      await this.create(params)
-      return { created: true, bundled: false }
+      const notice = await this.create(params)
+      return { created: true, bundled: false, notice }
     } else {
       const bundleables = await this.findBundleables(params)
 
@@ -189,12 +197,16 @@ export class NotificationService {
           })
         }
 
-        return { created: false, bundled: true }
+        return {
+          created: false,
+          bundled: true,
+          notice: { id: bundleables[0].id },
+        }
       }
 
       // create new notice
-      await this.create(params)
-      return { created: true, bundled: false }
+      const notice = await this.create(params)
+      return { created: true, bundled: false, notice }
     }
   }
 
@@ -208,67 +220,69 @@ export class NotificationService {
     entities,
     message,
     data,
-  }: PutNoticeParams): Promise<void> {
-    await this.knex.transaction(async (trx) => {
-      // create notice detail
-      const [{ id: noticeDetailId }] = await trx
-        .insert({
-          noticeType: type,
-          message,
-          data,
-        })
-        .into('notice_detail')
-        .returning('*')
+  }: PutNoticeParams): Promise<{ id: string }> {
+    const trx = await this.knex.transaction()
+    // create notice detail
+    const [{ id: noticeDetailId }] = await trx
+      .insert({
+        noticeType: type,
+        message,
+        data,
+      })
+      .into('notice_detail')
+      .returning('*')
 
-      // create notice
-      const [{ id: noticeId }] = await trx
+    // create notice
+    const noticeId = (
+      await trx
         .insert({
           uuid: v4(),
           noticeDetailId,
           recipientId,
         })
         .into('notice')
+        .returning('id')
+    )[0].id
+
+    // create notice actorId
+    if (actorId) {
+      await trx
+        .insert({
+          noticeId,
+          actorId,
+        })
+        .into('notice_actor')
         .returning('*')
+    }
 
-      // create notice actorId
-      if (actorId) {
-        await trx
-          .insert({
-            noticeId,
-            actorId,
-          })
-          .into('notice_actor')
-          .returning('*')
-      }
-
-      // create notice entities
-      if (entities) {
-        await Promise.all(
-          entities.map(
-            async ({
-              type: entityType,
-              entityTable,
-              entity,
-            }: NotificationEntity) => {
-              const { id: entityTypeId } = await trx
-                .select('id')
-                .from('entity_type')
-                .where({ table: entityTable })
-                .first()
-              await trx
-                .insert({
-                  type: entityType,
-                  entityTypeId,
-                  entityId: entity.id,
-                  noticeId,
-                })
-                .into('notice_entity')
-                .returning('*')
-            }
-          )
+    // create notice entities
+    if (entities) {
+      await Promise.all(
+        entities.map(
+          async ({
+            type: entityType,
+            entityTable,
+            entity,
+          }: NotificationEntity) => {
+            const { id: entityTypeId } = await trx
+              .select('id')
+              .from('entity_type')
+              .where({ table: entityTable })
+              .first()
+            await trx
+              .insert({
+                type: entityType,
+                entityTypeId,
+                entityId: entity.id,
+                noticeId,
+              })
+              .into('notice_entity')
+              .returning('*')
+          }
         )
-      }
-    })
+      )
+    }
+    return { id: noticeId }
   }
 
   /**

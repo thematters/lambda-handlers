@@ -9,13 +9,16 @@ const knexROConnectionUrl = process.env.MATTERS_PG_RO_CONNECTION_STRING || ''
 const redisHost = process.env.MATTERS_REDIS_HOST || ''
 const redisPort = parseInt(process.env.MATTERS_REDIS_PORT || '6379', 10)
 
+const SKIP_NOTICE_FLAG_PREFIX = 'skip-notice'
+const DELETE_NOTICE_KEY_PREFIX = 'delete-notice'
+const DELETE_NOTICE_CACHE_EXPIRE = 60 * 3 // 3 minutes
+const DEDUPLICATION_CACHE_EXPIRE = 60 * 10 // 10 minutes
+
 const knex = getKnexClient(knexConnectionUrl)
 const knexRO = getKnexClient(knexROConnectionUrl)
 const redis = new Redis(redisPort, redisHost)
 
 const notificationService = new NotificationService({ knex, knexRO })
-
-const DEDUPLICATION_CACHE_EXPIRE = 60 * 10 // 10 minutes
 
 export const handler = async (event: SQSEvent) => {
   const results = await Promise.allSettled(
@@ -24,8 +27,9 @@ export const handler = async (event: SQSEvent) => {
       console.log(body)
       const params = JSON.parse(body)
       if ('tag' in params) {
-        if (await redis.exists(params.tag)) {
-          console.info(`Tag ${params.tag} exists, skipped`)
+        const skipFlag = `${SKIP_NOTICE_FLAG_PREFIX}:${params.tag}`
+        if (await redis.exists(skipFlag)) {
+          console.info(`Tag ${skipFlag} exists, skipped`)
           return
         }
       }
@@ -36,7 +40,17 @@ export const handler = async (event: SQSEvent) => {
         return
       }
 
-      await notificationService.trigger(params)
+      const notices = await notificationService.trigger(params)
+
+      if (notices.length > 0 && 'tag' in params) {
+        const deleteKey = `${DELETE_NOTICE_KEY_PREFIX}:${params.tag}`
+        Promise.all(
+          notices.map(async (notice) => {
+            redis.sadd(deleteKey, notice.id)
+            redis.expire(deleteKey, DELETE_NOTICE_CACHE_EXPIRE)
+          })
+        )
+      }
 
       // deduplication: set notice hash
       await redis.set(noticeHashKey, 1, 'EX', DEDUPLICATION_CACHE_EXPIRE)
