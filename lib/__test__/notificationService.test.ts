@@ -230,7 +230,8 @@ describe('trigger notifications', () => {
         },
       ],
     })
-    expect(notice.id).toBeDefined()
+    // actorId is same as recipientId, notice is not created
+    expect(notice).toBeUndefined()
   })
   test('trigger `write_challenge_announcement` notice', async () => {
     const [{ id: campaignId }] = await knex('campaign')

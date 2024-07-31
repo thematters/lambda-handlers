@@ -282,6 +282,7 @@ export class NotificationService {
         )
       )
     }
+    await trx.commit()
     return { id: noticeId }
   }
 
