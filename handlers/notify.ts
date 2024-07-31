@@ -7,10 +7,13 @@ const knexConnectionUrl = process.env.MATTERS_PG_CONNECTION_STRING || ''
 const knexROConnectionUrl = process.env.MATTERS_PG_RO_CONNECTION_STRING || ''
 const redisHost = process.env.MATTERS_REDIS_HOST || ''
 const redisPort = parseInt(process.env.MATTERS_REDIS_PORT || '6379', 10)
+const deleteNoticeCacheTTL = parseInt(
+  process.env.MATTERS_DELETE_NOTICE_CACHE_TTL || '180',
+  10
+) // 3 minutes by default
 
 const SKIP_NOTICE_FLAG_PREFIX = 'skip-notice'
 const DELETE_NOTICE_KEY_PREFIX = 'delete-notice'
-const DELETE_NOTICE_CACHE_EXPIRE = 60 * 3 // 3 minutes
 
 const knex = getKnexClient(knexConnectionUrl)
 const knexRO = getKnexClient(knexROConnectionUrl)
@@ -39,7 +42,7 @@ export const handler = async (event: SQSEvent) => {
         Promise.all(
           notices.map(async (notice) => {
             redis.sadd(deleteKey, notice.id)
-            redis.expire(deleteKey, DELETE_NOTICE_CACHE_EXPIRE)
+            redis.expire(deleteKey, deleteNoticeCacheTTL)
           })
         )
       }
