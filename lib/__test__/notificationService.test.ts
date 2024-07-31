@@ -194,7 +194,7 @@ describe('find users', () => {
 describe('trigger notifications', () => {
   test('trigger `write_challenge_applied` notice', async () => {
     // no error
-    await notificationService.trigger({
+    const [notice] = await notificationService.trigger({
       event: OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_applied,
       recipientId: '1',
       entities: [
@@ -206,17 +206,19 @@ describe('trigger notifications', () => {
       ],
       data: { link: 'https://example.com' },
     })
+    expect(notice.id).toBeDefined()
   })
   test('trigger `badge_grand_slam_awarded` notice', async () => {
     // no errors
-    await notificationService.trigger({
+    const [notice] = await notificationService.trigger({
       event: OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded,
       recipientId: '1',
     })
+    expect(notice.id).toBeDefined()
   })
   test('trigger `collection_liked` notice', async () => {
     // no errors
-    await notificationService.trigger({
+    const [notice] = await notificationService.trigger({
       event: NOTICE_TYPE.collection_liked,
       actorId: '1',
       recipientId: '1',
@@ -228,6 +230,8 @@ describe('trigger notifications', () => {
         },
       ],
     })
+    // actorId is same as recipientId, notice is not created
+    expect(notice).toBeUndefined()
   })
   test('trigger `write_challenge_announcement` notice', async () => {
     const [{ id: campaignId }] = await knex('campaign')
@@ -246,7 +250,7 @@ describe('trigger notifications', () => {
       state: 'succeeded',
     })
     // no errors
-    await notificationService.trigger({
+    const [notice] = await notificationService.trigger({
       event: OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_announcement,
       data: {
         link: 'https://example.com',
@@ -258,5 +262,6 @@ describe('trigger notifications', () => {
         },
       },
     })
+    expect(notice.id).toBeDefined()
   })
 })

@@ -1,21 +1,25 @@
 import Redis from 'ioredis'
 import { SQSEvent } from 'aws-lambda'
 import { getKnexClient } from '../lib/utils/db.js'
-import { genMD5 } from '../lib/utils/hash.js'
 import { NotificationService } from '../lib/notification/index.js'
 
 const knexConnectionUrl = process.env.MATTERS_PG_CONNECTION_STRING || ''
 const knexROConnectionUrl = process.env.MATTERS_PG_RO_CONNECTION_STRING || ''
 const redisHost = process.env.MATTERS_REDIS_HOST || ''
 const redisPort = parseInt(process.env.MATTERS_REDIS_PORT || '6379', 10)
+const deleteNoticeCacheTTL = parseInt(
+  process.env.MATTERS_DELETE_NOTICE_CACHE_TTL || '180',
+  10
+) // 3 minutes by default
+
+const SKIP_NOTICE_FLAG_PREFIX = 'skip-notice'
+const DELETE_NOTICE_KEY_PREFIX = 'delete-notice'
 
 const knex = getKnexClient(knexConnectionUrl)
 const knexRO = getKnexClient(knexROConnectionUrl)
 const redis = new Redis(redisPort, redisHost)
 
 const notificationService = new NotificationService({ knex, knexRO })
-
-const DEDUPLICATION_CACHE_EXPIRE = 60 * 10 // 10 minutes
 
 export const handler = async (event: SQSEvent) => {
   const results = await Promise.allSettled(
@@ -24,22 +28,24 @@ export const handler = async (event: SQSEvent) => {
       console.log(body)
       const params = JSON.parse(body)
       if ('tag' in params) {
-        if (await redis.exists(params.tag)) {
-          console.info(`Tag ${params.tag} exists, skipped`)
+        const skipFlag = `${SKIP_NOTICE_FLAG_PREFIX}:${params.tag}`
+        if (await redis.exists(skipFlag)) {
+          console.info(`Tag ${skipFlag} exists, skipped`)
           return
         }
       }
-      // deduplication: skip if notice exists
-      const noticeHashKey = 'notice:' + genMD5(body)
-      if (await redis.exists(noticeHashKey)) {
-        console.info(`Notice duplicated, skipped`)
-        return
+
+      const notices = await notificationService.trigger(params)
+
+      if (notices.length > 0 && 'tag' in params) {
+        const deleteKey = `${DELETE_NOTICE_KEY_PREFIX}:${params.tag}`
+        Promise.all(
+          notices.map(async (notice) => {
+            redis.sadd(deleteKey, notice.id)
+            redis.expire(deleteKey, deleteNoticeCacheTTL)
+          })
+        )
       }
-
-      await notificationService.trigger(params)
-
-      // deduplication: set notice hash
-      await redis.set(noticeHashKey, 1, 'EX', DEDUPLICATION_CACHE_EXPIRE)
     })
   )
   // print failed reason
