@@ -549,6 +549,7 @@ export class NotificationService {
       comment_reported: true,
       article_reported: true,
       write_challenge_applied: true,
+      write_challenge_applied_late_bird: true,
       badge_grand_slam_awarded: true,
       write_challenge_announcement: true,
     }
@@ -744,6 +745,15 @@ export class NotificationService {
           type: NOTICE_TYPE.official_announcement,
           recipientIds: [params.recipientId],
           messages: [trans.write_challenge_applied(recipient.language, {})],
+          data: params.data,
+        }
+      case OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_applied_late_bird:
+        return {
+          type: NOTICE_TYPE.official_announcement,
+          recipientIds: [params.recipientId],
+          messages: [
+            trans.write_challenge_applied_late_bird(recipient.language, {}),
+          ],
           data: params.data,
         }
       case OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded: {

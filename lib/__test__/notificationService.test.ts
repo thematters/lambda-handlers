@@ -94,6 +94,7 @@ describe('user notify setting', () => {
     comment_reported: true,
     article_reported: true,
     write_challenge_applied: true,
+    write_challenge_applied_late_bird: true,
     badge_grand_slam_awarded: true,
     write_challenge_announcement: true,
   }
@@ -197,13 +198,6 @@ describe('trigger notifications', () => {
     const [notice] = await notificationService.trigger({
       event: OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_applied,
       recipientId: '1',
-      entities: [
-        {
-          type: 'target',
-          entityTable: 'campaign',
-          entity: { id: '1', name: 'test' },
-        },
-      ],
       data: { link: 'https://example.com' },
     })
     expect(notice.id).toBeDefined()
