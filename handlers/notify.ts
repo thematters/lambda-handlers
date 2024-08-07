@@ -1,6 +1,7 @@
 import Redis from 'ioredis'
 import { SQSEvent } from 'aws-lambda'
 import { getKnexClient } from '../lib/utils/db.js'
+import { genMD5 } from '../lib/utils/hash.js'
 import { NotificationService } from '../lib/notification/index.js'
 
 const knexConnectionUrl = process.env.MATTERS_PG_CONNECTION_STRING || ''
@@ -11,6 +12,7 @@ const deleteNoticeCacheTTL = parseInt(
   process.env.MATTERS_DELETE_NOTICE_CACHE_TTL || '180',
   10
 ) // 3 minutes by default
+const deduplicationCacheTTL = deleteNoticeCacheTTL
 
 const SKIP_NOTICE_FLAG_PREFIX = 'skip-notice'
 const DELETE_NOTICE_KEY_PREFIX = 'delete-notice'
@@ -35,7 +37,16 @@ export const handler = async (event: SQSEvent) => {
         }
       }
 
+      // deduplication: skip if notice exists
+      const noticeHashKey = 'notice:' + genMD5(body)
+      if (await redis.exists(noticeHashKey)) {
+        console.info(`Notice duplicated, skipped`)
+        return
+      }
       const notices = await notificationService.trigger(params)
+
+      // deduplication: set notice hash
+      await redis.set(noticeHashKey, 1, 'EX', deduplicationCacheTTL)
 
       if (notices.length > 0 && 'tag' in params) {
         const deleteKey = `${DELETE_NOTICE_KEY_PREFIX}:${params.tag}`
