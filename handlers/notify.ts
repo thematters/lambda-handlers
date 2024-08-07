@@ -38,8 +38,13 @@ export const handler = async (event: SQSEvent) => {
       }
 
       // deduplication: skip if notice exists
+      const deleteKey = `${DELETE_NOTICE_KEY_PREFIX}:${params.tag}`
       const noticeHashKey = 'notice:' + genMD5(body)
-      if (await redis.exists(noticeHashKey)) {
+      const [hashKeyExist, deleteKeyExist] = await Promise.all([
+        redis.exists(noticeHashKey),
+        redis.exists(deleteKey),
+      ])
+      if (hashKeyExist && deleteKeyExist) {
         console.info(`Notice duplicated, skipped`)
         return
       }
@@ -49,7 +54,6 @@ export const handler = async (event: SQSEvent) => {
       await redis.set(noticeHashKey, 1, 'EX', deduplicationCacheTTL)
 
       if (notices.length > 0 && 'tag' in params) {
-        const deleteKey = `${DELETE_NOTICE_KEY_PREFIX}:${params.tag}`
         Promise.all(
           notices.map(async (notice) => {
             redis.sadd(deleteKey, notice.id)
