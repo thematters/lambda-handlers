@@ -13,9 +13,11 @@ const deleteNoticeCacheTTL = parseInt(
   10
 ) // 3 minutes by default
 const deduplicationCacheTTL = deleteNoticeCacheTTL
+const lockTTL = 10 // 10 seconds
 
 const SKIP_NOTICE_FLAG_PREFIX = 'skip-notice'
 const DELETE_NOTICE_KEY_PREFIX = 'delete-notice'
+const LOCK_NOTICE_PREFIX = 'lock-notice'
 
 const knex = getKnexClient(knexConnectionUrl)
 const knexRO = getKnexClient(knexROConnectionUrl)
@@ -48,6 +50,11 @@ export const handler = async (event: SQSEvent) => {
         console.info(`Notice duplicated, skipped`)
         return
       }
+
+      // lock state operations, prevent `withdraw` at the same time
+      const lockKey = `${LOCK_NOTICE_PREFIX}:${params.tag}`
+      await redis.set(lockKey, 1, 'EX', lockTTL)
+
       const notices = await notificationService.trigger(params)
 
       // deduplication: set notice hash
@@ -61,6 +68,7 @@ export const handler = async (event: SQSEvent) => {
           })
         )
       }
+      await redis.del(lockKey)
     })
   )
   // print failed reason
