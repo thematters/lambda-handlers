@@ -28,7 +28,6 @@ export const handler = async (
   const { userArgs, tagArgs, articleArgs } = event
 
   await Promise.allSettled([
-    // checkMotorBadge(),
     refreshSearchIndexUser(userArgs),
     refreshSearchIndexTag(tagArgs),
     refreshSearchIndexArticle(articleArgs),

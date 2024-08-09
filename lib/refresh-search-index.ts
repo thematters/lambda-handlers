@@ -1,18 +1,14 @@
 import cheerio from 'cheerio'
-// import { PostgresError } from "postgres";
 import postgres from 'postgres'
 
 import { dbApi, sql, sqlSIW } from '../lib/db.js'
-// import { pgKnex } from "../lib/db.js";
 
 import createDebug from 'debug'
 
 const debugLog = createDebug('search-index-user-tag')
 
-// import OpenCC from "opencc";
 import * as opencc from 'opencc'
 const OpenCC = (opencc as any).default
-// console.log("imported opencc:", opencc, OpenCC);
 const converter = new OpenCC('t2s.json')
 
 const ARRAY_TYPE = 1009
@@ -39,8 +35,6 @@ export async function refreshSearchIndexUser({
   checkLastBatchOffset = 0,
   range = '1 month',
 } = {}) {
-  // const [{ version, now }] = await sql` SELECT VERSION(), NOW() `; console.log("pgres:", { version, now });
-
   let retries = 0
   const migrateFunc = async () => {
     await sql.file('./sql/create-table-search-index-user.sql')
@@ -151,7 +145,6 @@ RETURNING * ;`
         )
       }
       {
-        // const searchKey = "用戶名";
         const started = Date.now()
         const res = await sqlSIW`-- sample search
 SELECT * FROM search_index.user
@@ -283,8 +276,7 @@ RETURNING * ; `
           debugLog(
             new Date(),
             `inserted (or updated) ${res.length} items:`,
-            // res // .rows
-            res.map(({ id, contentOrig }) => `/${id}-${contentOrig}`) // .rows
+            res.map(({ id, contentOrig }) => `/${id}-${contentOrig}`)
           )
         }
 
@@ -323,14 +315,7 @@ LIMIT 100 ;`
         }
       }
 
-      console.error(
-        new Date(),
-        'refresh ERROR:',
-        // typeof err,
-        err.code,
-        // Object.entries(err),
-        err
-      )
+      console.error(new Date(), 'refresh ERROR:', err.code, err)
       break
     }
   } while (retries <= 1)
@@ -358,8 +343,6 @@ interface Article {
 
 // searchKey is a sample search key
 export async function refreshSearchIndexArticle({
-  searchKey = 'tag',
-  migrate = false,
   checkLastBatchSize = 1000,
   checkLastBatchOffset = 0,
   range = '1 month',
@@ -384,7 +367,6 @@ export async function refreshSearchIndexArticle({
           .map((e) => $(e).text().trim())
           .filter(Boolean)
           .join('\n') // $.text();
-        // arti.textContent = text;
         arti.titleOrig = arti.title
         ;[arti.title, arti.summary, arti.textContentConverted] =
           await Promise.all([
@@ -459,11 +441,6 @@ DO UPDATE
     , indexed_at = CURRENT_TIMESTAMP
 
 RETURNING * ;`
-    debugLog(
-      new Date(),
-      `inserted (or updated) ${res.length} items:`,
-      res[0]
-      // res.map(({ id, userName }) => `/@${userName}-${id}`) // .rows
-    )
+    debugLog(new Date(), `inserted (or updated) ${res.length} items:`, res[0])
   }
 }
