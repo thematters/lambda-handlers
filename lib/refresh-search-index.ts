@@ -343,12 +343,14 @@ interface Article {
 
 // searchKey is a sample search key
 export async function refreshSearchIndexArticle({
+  articleIds = [],
   checkLastBatchSize = 1000,
   checkLastBatchOffset = 0,
   range = '1 month',
 } = {}) {
   for await (const articles of dbApi
     .listArticles({
+      articleIds,
       take: checkLastBatchSize,
       skip: checkLastBatchOffset,
       range,
