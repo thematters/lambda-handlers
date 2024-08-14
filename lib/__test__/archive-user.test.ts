@@ -75,6 +75,7 @@ const createArchiveUserData = async ({ hasData }: { hasData: boolean }) => {
     author_id: user.id,
     state: 'active',
     content: 'test moment content',
+    short_hash: 'short_hash' + randomUUID(),
   })
 
   const [
