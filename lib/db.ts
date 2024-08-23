@@ -288,7 +288,7 @@ LIMIT ${take} OFFSET ${skip};`
     since = '2022-01-01',
   }: { limit?: number; offset?: number; since?: string | Date } = {}) {
     return sqlRO`-- check latest articles' author ipns_key
-SELECT u2.user_name, u2.display_name, GREATEST(ul.last_at ::date, u2.last_seen ::date) AS last_seen,
+SELECT u2.user_name, u2.display_name, last_seen ::date,
   count_articles, ipns_key, last_data_hash AS top_dir_data_hash, last_published, a.*,
   concat('https://matters.town/@', u2.user_name, '/', a.id, '-', a.slug) AS last_article_url,
   priv_key_pem, priv_key_name
@@ -299,7 +299,6 @@ FROM (
     AND author_id NOT IN (SELECT user_id FROM user_restriction) -- skip restricted authors
   ORDER BY author_id, id DESC
 ) a
-LEFT JOIN mat_views.users_lasts ul ON author_id=ul.id
 LEFT JOIN public.user u2 ON author_id=u2.id
 LEFT JOIN user_ipns_keys k ON author_id=k.user_id
 LEFT JOIN (
@@ -412,7 +411,7 @@ LEFT JOIN (
 
 -- remove known duplicates from 'mat_views.tags_lasts'
 WHERE
-  tag.id NOT IN ( SELECT UNNEST( array_remove(dup_tag_ids, id) ) FROM mat_views.tags_lasts WHERE ARRAY_LENGTH(dup_tag_ids,1)>1 )
+  tag.id NOT IN ( SELECT UNNEST( array_remove(dup_tag_ids, id) ) FROM mat_views.tags_lasts_view_materialized WHERE ARRAY_LENGTH(dup_tag_ids,1)>1 )
   ${
     range
       ? sql`AND ( tag.updated_at >= CURRENT_DATE - ${range} ::interval OR tag.id IN ( ${allRecentInUseTagIds} ) )`
