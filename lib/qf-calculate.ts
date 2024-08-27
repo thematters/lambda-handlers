@@ -24,8 +24,8 @@ import {
   AddressMattersOPSepoliaCurationContract,
   MattersCurationEvent,
   // EtherScanAPI,
-} from './billboard/client.js'
-import { checkSendersTrustPoints } from './billboard/qf-thresholds.js'
+  checkSendersTrustPoints,
+} from './billboard/index.js'
 import { s3GetFile, s3PutFile } from '../lib/utils/aws.js'
 
 const siteDomain = process.env.MATTERS_SITE_DOMAIN || ''
