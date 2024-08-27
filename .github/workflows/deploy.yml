@@ -275,22 +275,6 @@ jobs:
         env:
           IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
 
-  deploy-billboard-clear-auctions-dev:
-    runs-on: 'ubuntu-latest'
-    environment: 'dev'
-    needs: build-and-publish
-    steps:
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: re-deploy Lambda to dev
-        run: |
-          aws lambda update-function-code --function-name billboard-clear-auctions-dev \
-            --image-uri ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
-        env:
-          IMAGE_TAG: v${{ needs.build-and-publish.outputs.package-version }}
-
   deploy-check-nomad-badge-dev:
     runs-on: 'ubuntu-latest'
     environment: 'dev'
