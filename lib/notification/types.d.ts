@@ -1,9 +1,11 @@
+import type { TableName, User, Language } from '../types'
+
 import {
   NOTICE_TYPE,
   BUNDLED_NOTICE_TYPE,
   OFFICIAL_NOTICE_EXTEND_TYPE,
+  LANGUAGES,
 } from './enums'
-import { TableName, User } from '../types'
 
 type BaseNoticeType = keyof typeof NOTICE_TYPE
 
@@ -29,7 +31,6 @@ export type NotificationType =
 
 interface NotificationRequiredParams {
   event: NotificationType
-  recipientId: string
 }
 
 interface NotificationEntity<
@@ -113,6 +114,16 @@ interface NoticeArticleNewConnectedParams extends NotificationRequiredParams {
 }
 
 /**
+ * Collection
+ */
+interface NoticeCollectionLikedParams extends NotificationRequiredParams {
+  event: NOTICE_TYPE.collection_liked
+  recipientId: string
+  actorId: string
+  entities: [NotificationEntity<'target', 'collection'>]
+}
+
+/**
  * Moment
  */
 interface NoticeMomentLikedParams extends NotificationRequiredParams {
@@ -162,7 +173,7 @@ interface NoticeMomentNewCommentParams extends NotificationRequiredParams {
   recipientId: string
   actorId: string
   entities: [
-    NotificationEntity<'target', 'article'>,
+    NotificationEntity<'target', 'moment'>,
     NotificationEntity<'comment', 'comment'>
   ]
 }
@@ -335,15 +346,22 @@ interface NoticeCommentReportedParams extends NotificationRequiredParams {
 }
 
 interface NoticeWriteChallengeAppliedParams extends NotificationRequiredParams {
-  event: OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_applied
+  event:
+    | OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_applied
+    | OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_applied_late_bird
   recipientId: string
-  entities: [NotificationEntity<'target', 'campaign'>]
   data: { link: string }
 }
 
 interface NoticeBadgeGrandSlamAwardedParams extends NotificationRequiredParams {
   event: OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded
   recipientId: string
+}
+
+interface NoticeWriteChallengeAnnouncementParams
+  extends NotificationRequiredParams {
+  event: OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_announcement
+  data: { link: string; campaignId: string; messages: Record<Language, string> }
 }
 
 export type NotificationParams =
@@ -358,6 +376,8 @@ export type NotificationParams =
   | NoticeRevisedArticlePublishedParams
   | NoticeRevisedArticleNotPublishedParams
   | NoticeCircleNewArticleParams
+  // Collection
+  | NoticeCollectionLikedParams
   // Moment
   | NoticeMomentLikedParams
   | NoticeMomentMentionedYouParams
@@ -392,6 +412,7 @@ export type NotificationParams =
   | NoticeCommentReportedParams
   | NoticeWriteChallengeAppliedParams
   | NoticeBadgeGrandSlamAwardedParams
+  | NoticeWriteChallengeAnnouncementParams
 
 export type NoticeUserId = string
 
@@ -432,12 +453,10 @@ export type NoticeItem = NoticeDetail & {
   entities?: NoticeEntitiesMap
 }
 
-export interface PutNoticeParams {
+type BasePutParams = {
   type: BaseNoticeType
-  actorId?: NoticeUserId | null
-  recipientId: NoticeUserId
   entities?: NotificationEntity[]
-  message?: NoticeMessage | null
+  actorId?: NoticeUserId | null
   data?: NoticeData | null
 
   resend?: boolean // used by circle invitation notice
@@ -446,6 +465,16 @@ export interface PutNoticeParams {
     disabled?: boolean
     mergeData?: boolean // used by circle bundled notice
   }
+}
+
+export type PutNoticesParams = BasePutParams & {
+  recipientIds: NoticeUserId[]
+  messages?: NoticeMessage[] | null
+}
+
+export type PutNoticeParams = BasePutParams & {
+  recipientId: NoticeUserId
+  message?: NoticeMessage | null
 }
 
 // DB schema

@@ -3,6 +3,7 @@ import type { NotificationType } from '../notification/types'
 
 import { NOTICE_TYPE, OFFICIAL_NOTICE_EXTEND_TYPE } from '../notification/enums'
 import { NotificationService } from '../notification'
+import { mergeDataWith } from '../notification/utils'
 import { getKnexClient } from '../utils/db'
 
 let knex: Knex
@@ -19,9 +20,12 @@ beforeAll(async () => {
   notificationService = new NotificationService({ knex, knexRO: knex })
 })
 
-/**
- * Notification Service
- */
+// utils
+test('mergeDataWith', () => {
+  expect(mergeDataWith({ a: [1, 2] }, { a: [2, 3] })).toEqual({ a: [1, 2, 3] })
+})
+
+// service
 describe('user notify setting', () => {
   const defaultNoifySetting: Record<NotificationType, boolean> = {
     // user
@@ -35,6 +39,9 @@ describe('user notify setting', () => {
     revised_article_published: true,
     revised_article_not_published: true,
     circle_new_article: true,
+
+    // collection
+    collection_liked: true,
 
     // moment
     moment_liked: true,
@@ -87,7 +94,9 @@ describe('user notify setting', () => {
     comment_reported: true,
     article_reported: true,
     write_challenge_applied: true,
+    write_challenge_applied_late_bird: true,
     badge_grand_slam_awarded: true,
+    write_challenge_announcement: true,
   }
 
   test('user receives notifications', async () => {
@@ -185,25 +194,68 @@ describe('find users', () => {
 
 describe('trigger notifications', () => {
   test('trigger `write_challenge_applied` notice', async () => {
-    // not throw error
-    await notificationService.trigger({
+    // no error
+    const [notice] = await notificationService.trigger({
       event: OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_applied,
+      recipientId: '1',
+      data: { link: 'https://example.com' },
+    })
+    expect(notice.id).toBeDefined()
+  })
+  test('trigger `badge_grand_slam_awarded` notice', async () => {
+    // no errors
+    const [notice] = await notificationService.trigger({
+      event: OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded,
+      recipientId: '1',
+    })
+    expect(notice.id).toBeDefined()
+  })
+  test('trigger `collection_liked` notice', async () => {
+    // no errors
+    const [notice] = await notificationService.trigger({
+      event: NOTICE_TYPE.collection_liked,
+      actorId: '1',
       recipientId: '1',
       entities: [
         {
           type: 'target',
-          entityTable: 'campaign',
-          entity: { id: '1', name: 'test' },
+          entityTable: 'collection',
+          entity: { id: '1' },
         },
       ],
-      data: { link: 'https://example.com' },
     })
+    // actorId is same as recipientId, notice is not created
+    expect(notice).toBeUndefined()
   })
-  test('trigger `badge_grand_slam_awarded` notice', async () => {
-    // not throw error
-    await notificationService.trigger({
-      event: OFFICIAL_NOTICE_EXTEND_TYPE.badge_grand_slam_awarded,
-      recipientId: '1',
+  test('trigger `write_challenge_announcement` notice', async () => {
+    const [{ id: campaignId }] = await knex('campaign')
+      .insert({
+        type: 'writing_challenge',
+        creatorId: '1',
+        name: 'test',
+        description: 'test',
+        state: 'active',
+        shortHash: 'test-notice-hash',
+      })
+      .returning('id')
+    await knex('campaign_user').insert({
+      campaignId,
+      userId: '1',
+      state: 'succeeded',
     })
+    // no errors
+    const [notice] = await notificationService.trigger({
+      event: OFFICIAL_NOTICE_EXTEND_TYPE.write_challenge_announcement,
+      data: {
+        link: 'https://example.com',
+        campaignId,
+        messages: {
+          zh_hant: 'zh-Hant message',
+          zh_hans: 'zh-Hans message',
+          en: 'en message',
+        },
+      },
+    })
+    expect(notice.id).toBeDefined()
   })
 })

@@ -47,6 +47,12 @@ test('archive users having data', async () => {
     .whereIn('state', [ARTICLE_STATE.error, ARTICLE_STATE.pending])
     .count()
   expect(unpublishedArticleCount).toBe('0')
+
+  // moment archived
+  const moments = await knex('moment').where({ authorId: user.id })
+  for (const moment of moments) {
+    expect(moment.state).toBe('archived')
+  }
 })
 
 // helpers
@@ -64,6 +70,13 @@ const createArchiveUserData = async ({ hasData }: { hasData: boolean }) => {
       state: USER_STATE.archived,
     })
     .returning('id')
+
+  await knex('moment').insert({
+    author_id: user.id,
+    state: 'active',
+    content: 'test moment content',
+    short_hash: 'short_hash' + randomUUID(),
+  })
 
   const [
     { id: profileCoverId },

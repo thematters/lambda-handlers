@@ -14,6 +14,9 @@ export enum NOTICE_TYPE {
   // article-article
   article_new_collected = 'article_new_collected',
 
+  // collection
+  collection_liked = 'collection_liked',
+
   // moment
   moment_liked = 'moment_liked',
   moment_mentioned_you = 'moment_mentioned_you',
@@ -70,8 +73,10 @@ export enum OFFICIAL_NOTICE_EXTEND_TYPE {
   article_reported = 'article_reported',
   comment_reported = 'comment_reported',
   // write challenge related
-  write_challenge_applied = 'write_challenge_applied',
   badge_grand_slam_awarded = 'badge_grand_slam_awarded',
+  write_challenge_applied = 'write_challenge_applied',
+  write_challenge_applied_late_bird = 'write_challenge_applied_late_bird',
+  write_challenge_announcement = 'write_challenge_announcement',
 }
 
 export enum USER_ACTION {
