@@ -88,13 +88,12 @@ WHERE user_name = ANY (${Array.from(authorGroups.keys())})
   }
 
   const items = authors.map(
-    ({ id, userName, displayName, email, language, walletChanges }) => ({
+    ({ id, userName, displayName, email, language }) => ({
       userId: id as string,
       userName: userName as string,
       displayName: displayName as string,
       email: email as string,
       language: language as Language,
-      walletChanges: walletChanges as boolean,
       amount: showAmount(authorGroups.get(userName)!),
     })
   )
@@ -132,23 +131,16 @@ function showAmount(amount: bigint) {
 
 const getNoticeMessage = (
   language: Language,
-  amount: string | number,
-  walletChanges?: boolean
+  amount: string | number
 ): string => {
   switch (language) {
     case 'en':
-      return walletChanges
-        ? `You've received a ${amount} USDT funding from Billboard. Due to recent wallet address changes, the funding will be split according to the proportion of support received. Switch wallets to collect funds separately. Click this notification to go to the claim page.`
-        : `You've received a ${amount} USDT funding from Billboard. Click this notification to go to the claim page.`
+      return `You've received a ${amount} USDT funding from Billboard. Click this notification to go to the claim page.`
     case 'zh_hans':
-      return walletChanges
-        ? `你已获得 Billboard 配捐共 ${amount} USDT，因过去 14 天中有更换钱包地址，配捐金额将会按各钱包收到的支持比例拆分，请切换钱包地址分别领取。点击此则通知前往领取页面`
-        : `你已获得 Billboard 配捐共 ${amount} USDT，点击此则通知前往领取页面`
+      return `你已获得 Billboard 配捐共 ${amount} USDT，点击此则通知前往领取页面`
     case 'zh_hant':
     default:
-      return walletChanges
-        ? `你已獲得 Billboard 配捐共 ${amount} USDT，因過去 14 天中有更換錢包地址，配捐金額將會按各錢包收到的支持比例拆分，請切換錢包地址分別領取。點擊此則通知前往領取頁面`
-        : `你已獲得 Billboard 配捐共 ${amount} USDT，點擊此則通知前往領取頁面`
+      return `你已獲得 Billboard 配捐共 ${amount} USDT，點擊此則通知前往領取頁面`
   }
 }
 
@@ -160,18 +152,15 @@ async function sendQfNotifInsite(
     email: string
     language: Language
     amount: number | string
-    walletChanges?: boolean
   }>,
   doNotify = false
 ) {
   if (!doNotify) return
 
-  const allNotices = items.map(
-    ({ userId, language, amount, walletChanges, ...rest }) => ({
-      userId, // language,
-      message: getNoticeMessage(language, amount, walletChanges),
-    })
-  )
+  const allNotices = items.map(({ userId, language, amount, ...rest }) => ({
+    userId, // language,
+    message: getNoticeMessage(language, amount),
+  }))
   const allMessages = Array.from(
     new Set(allNotices.map(({ message }) => message))
   )
@@ -251,55 +240,50 @@ export async function sendQfNotificationEmails(
     email: string
     language: Language
     amount?: number | string
-    walletChanges?: boolean
   }>,
   doNotify = false
 ) {
   // if (!doNotify) return
 
   return Promise.allSettled(
-    items.map(
-      ({ userName, displayName, email, language, amount, walletChanges }) => {
-        console.log(`send QF-fund mail notification to:`, {
-          userName,
-          displayName,
-          email,
-          language,
-          amount,
-          walletChanges,
-        })
-        if (!email) {
-          return // can't send if no email
-        }
-        if (!doNotify) return
-
-        return mail
-          .send({
-            from: EMAIL_FROM_ASK,
-            templateId: getTemplateId(language),
-            personalizations: [
-              {
-                to: email,
-                dynamicTemplateData: {
-                  subject: getSubject(language),
-                  displayName,
-                  siteDomain,
-                  amount,
-                  walletChanges,
-                  claimLink,
-                  billboardUrl,
-                  billboardAnnouncementLink:
-                    language === 'en'
-                      ? `https://matters.town/@web3/554164-test-lauch-of-on-chain-advertisment-protocol-with-80-revenue-back-to-creators-bafybeifsq4u5wewvwsogeo3nxilu4lycxjsed7lfilteikskbiig46qaei?locale=en`
-                      : 'https://matters.town/@hi176/554162-matters-試驗全新鏈上廣告機制-收入-80-配捐創作者-bafybeih5wa5s2ndr5ahsxwj3rlwo25erjggmvvdnr6s5mnocngiqk6224e',
-                },
-              },
-            ],
-          })
-          .then((res: any) => console.log(`mail "${email}" res:`, res))
-          .catch((err: Error) => console.error(`mail "${email}" ERROR:`, err))
+    items.map(({ userName, displayName, email, language, amount }) => {
+      console.log(`send QF-fund mail notification to:`, {
+        userName,
+        displayName,
+        email,
+        language,
+        amount,
+      })
+      if (!email) {
+        return // can't send if no email
       }
-    )
+      if (!doNotify) return
+
+      return mail
+        .send({
+          from: EMAIL_FROM_ASK,
+          templateId: getTemplateId(language),
+          personalizations: [
+            {
+              to: email,
+              dynamicTemplateData: {
+                subject: getSubject(language),
+                displayName,
+                siteDomain,
+                amount,
+                claimLink,
+                billboardUrl,
+                billboardAnnouncementLink:
+                  language === 'en'
+                    ? `https://matters.town/@web3/554164-test-lauch-of-on-chain-advertisment-protocol-with-80-revenue-back-to-creators-bafybeifsq4u5wewvwsogeo3nxilu4lycxjsed7lfilteikskbiig46qaei?locale=en`
+                    : 'https://matters.town/@hi176/554162-matters-試驗全新鏈上廣告機制-收入-80-配捐創作者-bafybeih5wa5s2ndr5ahsxwj3rlwo25erjggmvvdnr6s5mnocngiqk6224e',
+              },
+            },
+          ],
+        })
+        .then((res: any) => console.log(`mail "${email}" res:`, res))
+        .catch((err: Error) => console.error(`mail "${email}" ERROR:`, err))
+    })
   )
 }
 
