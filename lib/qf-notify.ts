@@ -294,10 +294,9 @@ function getTemplateId(language: Language): string {
     en: 'd-6c33968152a14578918789241f63279a',
   }
   const templateIdsProd = {
-    // branch out when necessary
-    zh_hant: 'd-dd6f9660b30a40eaa831254275c4b0b6',
-    zh_hans: 'd-f33d89d33a72419dbfc504c09ca84f81',
-    en: 'd-6c33968152a14578918789241f63279a',
+    zh_hant: 'd-7a1f55f59fcf45a0a824904d6056b7ce',
+    zh_hans: 'd-d4abaa12250c4c80be8396fd18563930',
+    en: 'd-ac54ca1b20c04e079ccbb1c9102f87dd',
   }
   return (isProd ? templateIdsProd : templateIdsDev)[language]
 }
