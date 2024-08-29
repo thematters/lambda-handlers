@@ -13,7 +13,7 @@ import {
   sendQfNotifications, //  sendQfNotificationNEmails,
 } from '../lib/qf-notify.js'
 import { s3GetFile } from '../lib/utils/aws.js'
-import { SLACK_MESSAGE_STATE, Slack } from '../lib/utils/slack.js'
+// import { SLACK_MESSAGE_STATE, Slack } from '../lib/utils/slack.js'
 
 const ACCESS_TOKEN = `${process.env.ACCESS_TOKEN}`
 
@@ -36,7 +36,7 @@ export const handler = async (
   console.log(`Context: ${JSON.stringify(context, null, 2)}`)
   // const forceRun = !!("forceRun" in ((event?.queryStringParameters as any) || {}));
 
-  const slack = new Slack()
+  // const slack = new Slack()
   const { method, path } = ((event?.requestContext as any)?.http as any) || {}
   const queryStringParameters = (event?.queryStringParameters as any) || {}
   const {
@@ -163,20 +163,20 @@ export const handler = async (
         amountTotal,
         6
       )} USDT to ${sent?.length ?? 0} authors`
-      if (Array.isArray(sent) && sent?.length > 0) {
-        await slack.sendStripeAlert({
-          data: {
-            amountTotal,
-            sent: sent.length,
-            distrib: sent.map(
-              ({ userName, displayName, amount }: any) =>
-                `${displayName} @${userName} ${amount} USDT`
-            ),
-          },
-          message,
-          state: SLACK_MESSAGE_STATE.successful,
-        })
-      }
+      // if (Array.isArray(sent) && sent?.length > 0) {
+      //   await slack.sendStripeAlert({
+      //     data: {
+      //       amountTotal,
+      //       sent: sent.length,
+      //       distrib: sent.map(
+      //         ({ userName, displayName, amount }: any) =>
+      //           `${displayName} @${userName} ${amount} USDT`
+      //       ),
+      //     },
+      //     message,
+      //     state: SLACK_MESSAGE_STATE.successful,
+      //   })
+      // }
       return {
         statusCode: 200,
         body: message,

@@ -1216,6 +1216,11 @@ export async function finalizeQFScore({
 
   const targetRound = rounds.find((r) => r.dirpath === currRoundPath)
 
+  if (!targetRound) {
+    console.error(new Date(), `no round found for ${currRoundPath}`)
+    return
+  }
+
   const roundsFileContent =
     '[ ' +
     rounds
