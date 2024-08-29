@@ -45,8 +45,6 @@ const knownCollectiveSenders = new Set(
   // ['imo_treasury']
 )
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '' // for servide side run only;
-
 const UINT256_MAX_BIGINT =
   0x0_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffffn // uint256max
 
@@ -69,8 +67,6 @@ export async function calculateQFScore({
   sharesTotal?: number
   finalize?: boolean
 }) {
-  const started = new Date()
-
   const blockNumbers = await Promise.all([
     publicClientDefault.getBlockNumber(),
     publicClientPolygonMainnet.getBlockNumber(),
@@ -83,12 +79,14 @@ export async function calculateQFScore({
   )
   const [latestOPBlockNumber] = blockNumbers
 
+  // correct `toBlock` and `toTime` if it's in the future
   if (toBlock > latestOPBlockNumber) {
     toBlock = latestOPBlockNumber
-    toTime = started // .toISOString()
+    toTime = new Date()
     finalize = false // cannot finalize for future block
   }
 
+  // make `fromTime` and `toTime`
   {
     const res1 = await // EtherScanAPI.getBlockReward({ blockno: fromBlock })
     publicClientDefault.getBlock({ blockNumber: fromBlock })
@@ -124,12 +122,12 @@ export async function calculateQFScore({
     toBlock,
   })
 
-  const contractAddress = isProd
+  const curationContractAddress = isProd
     ? AddressMattersOPCurationContract
-    : AddressMattersOPSepoliaCurationContract // '0x5edebbdae7b5c79a69aacf7873796bb1ec664db8',
+    : AddressMattersOPSepoliaCurationContract
 
   const logs = (await publicClientDefault.getLogs({
-    address: contractAddress,
+    address: curationContractAddress,
     event: MattersCurationEvent,
     fromBlock, // : isProd ? 117058632n : 8438904n, // the contract creation block;
     toBlock,
@@ -140,7 +138,7 @@ export async function calculateQFScore({
       new Date(),
       `there aren't enough logs (${logs.length}) between the two block numbers, try again with a larger range:`,
       {
-        address: contractAddress,
+        address: curationContractAddress,
         event: MattersCurationEvent,
         fromBlock,
         toBlock,
@@ -1176,6 +1174,75 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
 
     return totals
   }
+}
+
+export async function finalizeQFScore({
+  fromBlock,
+  toBlock,
+}: {
+  fromBlock: bigint
+  toBlock: bigint
+}) {
+  let existingRounds: any[] = []
+  try {
+    const res = await s3GetFile({
+      bucket: MattersBillboardS3Bucket,
+      key: `${s3FilePathPrefix}/rounds.json`,
+    })
+    console.log(
+      new Date(),
+      `s3 get existing rounds:`,
+      res.ContentLength,
+      res.ContentType
+    )
+    if (res.Body && res.ContentLength! > 0) {
+      existingRounds = JSON.parse(await res.Body.transformToString()) as any[]
+    }
+  } catch (err) {
+    console.error(new Date(), 'ERROR in reading existing rounds:', err)
+  }
+
+  const currRoundPath = `${
+    isProd ? 'optimism' : 'opSepolia'
+  }-${fromBlock}-${toBlock}`
+
+  const rounds = existingRounds.map((r) => {
+    // mark target round as finalized
+    if (r.dirpath === currRoundPath) {
+      r.draft = undefined
+    }
+    return r
+  })
+
+  const targetRound = rounds.find((r) => r.dirpath === currRoundPath)
+
+  const roundsFileContent =
+    '[ ' +
+    rounds
+      .map((row) =>
+        JSON.stringify(
+          row,
+          (_, v) =>
+            typeof v === 'bigint'
+              ? v.toString() // util.format("%i", v) // +Number(v) // current numbers are all < Number.MAX_SAFE_INTEGER // 9_007_199_254_740_991
+              : v // replacer,
+          // 2 // omit to be compact
+        )
+      )
+      .join(',\n') +
+    ' ]'
+
+  await s3PutFile({
+    Bucket: MattersBillboardS3Bucket,
+    Key: `${s3FilePathPrefix}/rounds.json`,
+    Body: roundsFileContent,
+    // ACL: "public-read",
+    ContentType: 'application/json',
+  }).then((res) =>
+    console.log(new Date(), `finalize round ${targetRound.root}`)
+  )
+
+  return { root: targetRound.root }
 }
 
 // https://github.com/d3/d3-array/blob/main/src/quantile.js#L23

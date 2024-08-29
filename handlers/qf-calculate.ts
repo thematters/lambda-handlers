@@ -4,6 +4,7 @@ import { formatUnits } from 'viem'
 import * as d3 from 'd3-array'
 import {
   calculateQFScore,
+  finalizeQFScore,
   MattersBillboardS3Bucket,
   isProd,
   s3FilePathPrefix,
@@ -58,6 +59,7 @@ export const handler = async (
       event?.forceRun ||
       (path === '/qf-calculator' && accept?.startsWith('application/json')) ||
       (path === '/send-notifications' && accept) ||
+      (path === '/qf-finalize' && accept) ||
       (path === '/get-rounds' && accept)
     )
   ) {
@@ -191,7 +193,7 @@ export const handler = async (
     path === '/qf-calculator' &&
     accept?.startsWith('application/json')
   ) {
-    const { fromTime, toTime, fromBlock, toBlock, amountTotal, finalize } = (
+    const { fromBlock, toBlock, amountTotal, finalize } = (
       event?.forceRun ? event : queryStringParameters
     ) as InputBodyParameters
 
@@ -218,6 +220,47 @@ export const handler = async (
       body: JSON.stringify({
         message: 'done.',
         root, // tree
+      }),
+    }
+  } else if (
+    method === 'POST' &&
+    path === '/qf-finalize' &&
+    accept?.startsWith('application/json')
+  ) {
+    const { fromBlock, toBlock } = (
+      event?.forceRun ? event : queryStringParameters
+    ) as InputBodyParameters
+
+    if (!fromBlock || !toBlock) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          message: 'bad parameters, fromBlock and toBlock are required.',
+        }),
+      }
+    }
+
+    const { root } =
+      (await finalizeQFScore({
+        fromBlock: BigInt(fromBlock),
+        toBlock: BigInt(toBlock),
+      })) || {}
+
+    if (!root) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          message: 'bad parameters, no tree root, check logs for details.',
+        }),
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({
+        message: 'done.',
+        root,
       }),
     }
   }
