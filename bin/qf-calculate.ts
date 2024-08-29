@@ -36,7 +36,6 @@ async function main() {
     fromBlock,
     toBlock,
     amountTotal,
-    write_gist: true, // for server side running output;
   })
   console.log(new Date(), 'res:', res)
 }

@@ -59,7 +59,6 @@ export async function calculateQFScore({
   finalize,
   amountTotal = 250_000_000n, // 250 USDT
   sharesTotal = 10_000,
-  write_gist = true,
 }: {
   // between: string[];
   fromTime?: Date
@@ -69,7 +68,6 @@ export async function calculateQFScore({
   amountTotal?: bigint
   sharesTotal?: number
   finalize?: boolean
-  write_gist?: boolean // for server side run only;
 }) {
   const started = new Date()
 
@@ -392,13 +390,9 @@ SELECT * FROM (
     fromTime as Date
   )}\` ~ \`${dateFormat.format(toTime as Date)}\` (UTC+8)`
 
-  const gist: any = {
-    description: `Quadratic-Funding Calculations (${runningBetween})`,
-    public: false,
-    files: {
-      'README.md': {
-        content: `During MattersCuration contract runtime between (to overwrite later ...) ...`,
-      },
+  const files: any = {
+    'README.md': {
+      content: `During MattersCuration contract runtime between (to overwrite later ...) ...`,
     },
   }
 
@@ -601,9 +595,9 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
       sendersOut.set(k, obj)
     })
 
-    const sendersContent = (gist.files[`senders.tsv`] = {
+    files[`senders.tsv`] = {
       content: tsvFormat(Array.from(sendersOut.values())), // bufs.join('\n'),
-    })
+    }
   }
 
   const seqQualifiedGroups = d3.group(
@@ -745,9 +739,9 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
       ])
     })
 
-    const distrib = (gist.files[`distrib.tsv`] = {
+    files[`distrib.tsv`] = {
       content: tsvFormat(values), // bufs.join('\n'),
-    })
+    }
 
     const distribByAuthor = d3.rollup(
       values,
@@ -772,7 +766,8 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
       },
       (d) => d.userName
     )
-    const distribAuthors = (gist.files[`authors.tsv`] = {
+
+    files[`authors.tsv`] = {
       content: tsvFormat(
         authors.map((aut) => {
           const { userName, displayName, ethAddress, email, isNew } = aut
@@ -816,9 +811,9 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
           }
         })
       ), // bufs.join('\n'),
-    })
+    }
 
-    const distribJSON = (gist.files[`distrib.json`] = {
+    files[`distrib.json`] = {
       content:
         '[ ' +
         values
@@ -857,7 +852,7 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
           )
           .join(',\n') +
         ' ]',
-    })
+    }
   }
 
   // (2)
@@ -873,7 +868,7 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
   // (4) // write out to somewhere S3 bucket?
   // fs.writeFileSync("out/tree.json", JSON.stringify(tree.dump(), null, 2));
   // console.log("Merkle-Tree Dump:", JSON.stringify(tree.dump(), null, 2));
-  gist.files[`treedump.json`] = {
+  files[`treedump.json`] = {
     content: JSON.stringify(tree.dump(), null, 2),
   }
 
@@ -935,7 +930,7 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
         draft: finalize ? undefined : true, // this item is a draft, to be replaced to final
       },
     ])
-  gist.files[`rounds.json`] = {
+  files[`rounds.json`] = {
     // JSON.stringify(rounds, null, 2),
     content:
       '[ ' +
@@ -954,7 +949,7 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
       ' ]',
   }
 
-  gist.files['README.md'].content = `${runningBetween},
+  files['README.md'].content = `${runningBetween},
 
 \`\`\`js
 // from Optimism onChain:
@@ -989,37 +984,6 @@ Merkle Tree Root (with ${treeValues.length} entries): \`${tree.root}\`
 
 this is analyzing results with [Quadratic Funding score calcuation with Pairwise Mechanism](https://github.com/gitcoinco/quadratic-funding?tab=readme-ov-file#implementation-upgrade-the-pairwise-mechanism)`
 
-  let gist_url: string | undefined = undefined
-  // skip if no GITHUB_TOKEN
-  console.log('to write_gist', !!(write_gist && GITHUB_TOKEN))
-  if (write_gist && GITHUB_TOKEN) {
-    try {
-      const resGist = await fetch('https://api.github.com/gists', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${GITHUB_TOKEN}`,
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-        body: JSON.stringify(gist),
-      }).then(async (res) => {
-        try {
-          return await res.json()
-        } catch (err) {
-          console.log(new Date(), `failed parse as json:`, res.ok, res.headers)
-          console.log(await res.text())
-        }
-      })
-
-      // console.log('gist res:', resGist)
-      gist_url = resGist?.html_url
-    } catch (err) {
-      console.error(new Date(), `failed POST to gist:`, err, 'with:', gist)
-    } finally {
-      console.log('set gist url:', gist_url)
-    }
-  }
-
   await Promise.all(
     [
       'README.md',
@@ -1033,7 +997,7 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
         s3PutFile({
           Bucket: MattersBillboardS3Bucket, // 'matters-billboard',
           Key: `${s3FilePathPrefix}/${currRoundPath}/${filename}`,
-          Body: gist.files[filename].content,
+          Body: files[filename].content,
         }) // .then((res) => console.log(new Date(), `s3 treedump:`, res));
     )
   )
@@ -1041,7 +1005,7 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
   await s3PutFile({
     Bucket: MattersBillboardS3Bucket, // 'matters-billboard',
     Key: `${s3FilePathPrefix}/rounds.json`,
-    Body: gist.files[`rounds.json`].content,
+    Body: files[`rounds.json`].content,
     // ACL: "public-read",
     ContentType: 'application/json',
   }).then((res) =>
@@ -1052,7 +1016,7 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
     )
   )
 
-  return { root: tree.root, gist_url }
+  return { root: tree.root }
 
   /*
    * calculates the clr amount at the given threshold and total pot

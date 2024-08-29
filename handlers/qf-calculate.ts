@@ -195,7 +195,7 @@ export const handler = async (
       event?.forceRun ? event : queryStringParameters
     ) as InputBodyParameters
 
-    const { root, gist_url } =
+    const { root } =
       (await calculateQFScore({
         // fromTime, toTime,
         fromBlock: BigInt(fromBlock),
@@ -218,7 +218,6 @@ export const handler = async (
       body: JSON.stringify({
         message: 'done.',
         root, // tree
-        gist_url,
       }),
     }
   }
