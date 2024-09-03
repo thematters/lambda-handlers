@@ -24,8 +24,8 @@ import {
   AddressMattersOPSepoliaCurationContract,
   MattersCurationEvent,
   // EtherScanAPI,
-} from './billboard/client.js'
-import { checkSendersTrustPoints } from './billboard/qf-thresholds.js'
+  checkSendersTrustPoints,
+} from './billboard/index.js'
 import { s3GetFile, s3PutFile } from '../lib/utils/aws.js'
 
 const siteDomain = process.env.MATTERS_SITE_DOMAIN || ''
@@ -45,8 +45,6 @@ const knownCollectiveSenders = new Set(
   // ['imo_treasury']
 )
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '' // for servide side run only;
-
 const UINT256_MAX_BIGINT =
   0x0_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffffn // uint256max
 
@@ -59,7 +57,6 @@ export async function calculateQFScore({
   finalize,
   amountTotal = 250_000_000n, // 250 USDT
   sharesTotal = 10_000,
-  write_gist = true,
 }: {
   // between: string[];
   fromTime?: Date
@@ -69,10 +66,7 @@ export async function calculateQFScore({
   amountTotal?: bigint
   sharesTotal?: number
   finalize?: boolean
-  write_gist?: boolean // for server side run only;
 }) {
-  const started = new Date()
-
   const blockNumbers = await Promise.all([
     publicClientDefault.getBlockNumber(),
     publicClientPolygonMainnet.getBlockNumber(),
@@ -85,12 +79,14 @@ export async function calculateQFScore({
   )
   const [latestOPBlockNumber] = blockNumbers
 
+  // correct `toBlock` and `toTime` if it's in the future
   if (toBlock > latestOPBlockNumber) {
     toBlock = latestOPBlockNumber
-    toTime = started // .toISOString()
+    toTime = new Date()
     finalize = false // cannot finalize for future block
   }
 
+  // make `fromTime` and `toTime`
   {
     const res1 = await // EtherScanAPI.getBlockReward({ blockno: fromBlock })
     publicClientDefault.getBlock({ blockNumber: fromBlock })
@@ -126,12 +122,12 @@ export async function calculateQFScore({
     toBlock,
   })
 
-  const contractAddress = isProd
+  const curationContractAddress = isProd
     ? AddressMattersOPCurationContract
-    : AddressMattersOPSepoliaCurationContract // '0x5edebbdae7b5c79a69aacf7873796bb1ec664db8',
+    : AddressMattersOPSepoliaCurationContract
 
   const logs = (await publicClientDefault.getLogs({
-    address: contractAddress,
+    address: curationContractAddress,
     event: MattersCurationEvent,
     fromBlock, // : isProd ? 117058632n : 8438904n, // the contract creation block;
     toBlock,
@@ -142,7 +138,7 @@ export async function calculateQFScore({
       new Date(),
       `there aren't enough logs (${logs.length}) between the two block numbers, try again with a larger range:`,
       {
-        address: contractAddress,
+        address: curationContractAddress,
         event: MattersCurationEvent,
         fromBlock,
         toBlock,
@@ -392,13 +388,9 @@ SELECT * FROM (
     fromTime as Date
   )}\` ~ \`${dateFormat.format(toTime as Date)}\` (UTC+8)`
 
-  const gist: any = {
-    description: `Quadratic-Funding Calculations (${runningBetween})`,
-    public: false,
-    files: {
-      'README.md': {
-        content: `During MattersCuration contract runtime between (to overwrite later ...) ...`,
-      },
+  const files: any = {
+    'README.md': {
+      content: `During MattersCuration contract runtime between (to overwrite later ...) ...`,
     },
   }
 
@@ -601,9 +593,9 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
       sendersOut.set(k, obj)
     })
 
-    const sendersContent = (gist.files[`senders.tsv`] = {
+    files[`senders.tsv`] = {
       content: tsvFormat(Array.from(sendersOut.values())), // bufs.join('\n'),
-    })
+    }
   }
 
   const seqQualifiedGroups = d3.group(
@@ -745,9 +737,9 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
       ])
     })
 
-    const distrib = (gist.files[`distrib.tsv`] = {
+    files[`distrib.tsv`] = {
       content: tsvFormat(values), // bufs.join('\n'),
-    })
+    }
 
     const distribByAuthor = d3.rollup(
       values,
@@ -772,7 +764,8 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
       },
       (d) => d.userName
     )
-    const distribAuthors = (gist.files[`authors.tsv`] = {
+
+    files[`authors.tsv`] = {
       content: tsvFormat(
         authors.map((aut) => {
           const { userName, displayName, ethAddress, email, isNew } = aut
@@ -816,9 +809,9 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
           }
         })
       ), // bufs.join('\n'),
-    })
+    }
 
-    const distribJSON = (gist.files[`distrib.json`] = {
+    files[`distrib.json`] = {
       content:
         '[ ' +
         values
@@ -857,7 +850,7 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
           )
           .join(',\n') +
         ' ]',
-    })
+    }
   }
 
   // (2)
@@ -873,7 +866,7 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
   // (4) // write out to somewhere S3 bucket?
   // fs.writeFileSync("out/tree.json", JSON.stringify(tree.dump(), null, 2));
   // console.log("Merkle-Tree Dump:", JSON.stringify(tree.dump(), null, 2));
-  gist.files[`treedump.json`] = {
+  files[`treedump.json`] = {
     content: JSON.stringify(tree.dump(), null, 2),
   }
 
@@ -935,7 +928,7 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
         draft: finalize ? undefined : true, // this item is a draft, to be replaced to final
       },
     ])
-  gist.files[`rounds.json`] = {
+  files[`rounds.json`] = {
     // JSON.stringify(rounds, null, 2),
     content:
       '[ ' +
@@ -954,7 +947,7 @@ WHERE lower(sender.eth_address) =ANY(${Array.from(senderAddresses)})
       ' ]',
   }
 
-  gist.files['README.md'].content = `${runningBetween},
+  files['README.md'].content = `${runningBetween},
 
 \`\`\`js
 // from Optimism onChain:
@@ -989,37 +982,6 @@ Merkle Tree Root (with ${treeValues.length} entries): \`${tree.root}\`
 
 this is analyzing results with [Quadratic Funding score calcuation with Pairwise Mechanism](https://github.com/gitcoinco/quadratic-funding?tab=readme-ov-file#implementation-upgrade-the-pairwise-mechanism)`
 
-  let gist_url: string | undefined = undefined
-  // skip if no GITHUB_TOKEN
-  console.log('to write_gist', !!(write_gist && GITHUB_TOKEN))
-  if (write_gist && GITHUB_TOKEN) {
-    try {
-      const resGist = await fetch('https://api.github.com/gists', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${GITHUB_TOKEN}`,
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-        body: JSON.stringify(gist),
-      }).then(async (res) => {
-        try {
-          return await res.json()
-        } catch (err) {
-          console.log(new Date(), `failed parse as json:`, res.ok, res.headers)
-          console.log(await res.text())
-        }
-      })
-
-      // console.log('gist res:', resGist)
-      gist_url = resGist?.html_url
-    } catch (err) {
-      console.error(new Date(), `failed POST to gist:`, err, 'with:', gist)
-    } finally {
-      console.log('set gist url:', gist_url)
-    }
-  }
-
   await Promise.all(
     [
       'README.md',
@@ -1033,7 +995,7 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
         s3PutFile({
           Bucket: MattersBillboardS3Bucket, // 'matters-billboard',
           Key: `${s3FilePathPrefix}/${currRoundPath}/${filename}`,
-          Body: gist.files[filename].content,
+          Body: files[filename].content,
         }) // .then((res) => console.log(new Date(), `s3 treedump:`, res));
     )
   )
@@ -1041,7 +1003,7 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
   await s3PutFile({
     Bucket: MattersBillboardS3Bucket, // 'matters-billboard',
     Key: `${s3FilePathPrefix}/rounds.json`,
-    Body: gist.files[`rounds.json`].content,
+    Body: files[`rounds.json`].content,
     // ACL: "public-read",
     ContentType: 'application/json',
   }).then((res) =>
@@ -1052,7 +1014,7 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
     )
   )
 
-  return { root: tree.root, gist_url }
+  return { root: tree.root }
 
   /*
    * calculates the clr amount at the given threshold and total pot
@@ -1212,6 +1174,80 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
 
     return totals
   }
+}
+
+export async function finalizeQFScore({
+  fromBlock,
+  toBlock,
+}: {
+  fromBlock: bigint
+  toBlock: bigint
+}) {
+  let existingRounds: any[] = []
+  try {
+    const res = await s3GetFile({
+      bucket: MattersBillboardS3Bucket,
+      key: `${s3FilePathPrefix}/rounds.json`,
+    })
+    console.log(
+      new Date(),
+      `s3 get existing rounds:`,
+      res.ContentLength,
+      res.ContentType
+    )
+    if (res.Body && res.ContentLength! > 0) {
+      existingRounds = JSON.parse(await res.Body.transformToString()) as any[]
+    }
+  } catch (err) {
+    console.error(new Date(), 'ERROR in reading existing rounds:', err)
+  }
+
+  const currRoundPath = `${
+    isProd ? 'optimism' : 'opSepolia'
+  }-${fromBlock}-${toBlock}`
+
+  const rounds = existingRounds.map((r) => {
+    // mark target round as finalized
+    if (r.dirpath === currRoundPath) {
+      r.draft = undefined
+    }
+    return r
+  })
+
+  const targetRound = rounds.find((r) => r.dirpath === currRoundPath)
+
+  if (!targetRound) {
+    console.error(new Date(), `no round found for ${currRoundPath}`)
+    return
+  }
+
+  const roundsFileContent =
+    '[ ' +
+    rounds
+      .map((row) =>
+        JSON.stringify(
+          row,
+          (_, v) =>
+            typeof v === 'bigint'
+              ? v.toString() // util.format("%i", v) // +Number(v) // current numbers are all < Number.MAX_SAFE_INTEGER // 9_007_199_254_740_991
+              : v // replacer,
+          // 2 // omit to be compact
+        )
+      )
+      .join(',\n') +
+    ' ]'
+
+  await s3PutFile({
+    Bucket: MattersBillboardS3Bucket,
+    Key: `${s3FilePathPrefix}/rounds.json`,
+    Body: roundsFileContent,
+    // ACL: "public-read",
+    ContentType: 'application/json',
+  }).then((res) =>
+    console.log(new Date(), `finalize round ${targetRound.root}`)
+  )
+
+  return { root: targetRound.root }
 }
 
 // https://github.com/d3/d3-array/blob/main/src/quantile.js#L23

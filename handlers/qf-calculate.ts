@@ -4,6 +4,7 @@ import { formatUnits } from 'viem'
 import * as d3 from 'd3-array'
 import {
   calculateQFScore,
+  finalizeQFScore,
   MattersBillboardS3Bucket,
   isProd,
   s3FilePathPrefix,
@@ -12,7 +13,7 @@ import {
   sendQfNotifications, //  sendQfNotificationNEmails,
 } from '../lib/qf-notify.js'
 import { s3GetFile } from '../lib/utils/aws.js'
-import { SLACK_MESSAGE_STATE, Slack } from '../lib/utils/slack.js'
+// import { SLACK_MESSAGE_STATE, Slack } from '../lib/utils/slack.js'
 
 const ACCESS_TOKEN = `${process.env.ACCESS_TOKEN}`
 
@@ -35,7 +36,7 @@ export const handler = async (
   console.log(`Context: ${JSON.stringify(context, null, 2)}`)
   // const forceRun = !!("forceRun" in ((event?.queryStringParameters as any) || {}));
 
-  const slack = new Slack()
+  // const slack = new Slack()
   const { method, path } = ((event?.requestContext as any)?.http as any) || {}
   const queryStringParameters = (event?.queryStringParameters as any) || {}
   const {
@@ -58,6 +59,7 @@ export const handler = async (
       event?.forceRun ||
       (path === '/qf-calculator' && accept?.startsWith('application/json')) ||
       (path === '/send-notifications' && accept) ||
+      (path === '/qf-finalize' && accept) ||
       (path === '/get-rounds' && accept)
     )
   ) {
@@ -161,20 +163,20 @@ export const handler = async (
         amountTotal,
         6
       )} USDT to ${sent?.length ?? 0} authors`
-      if (Array.isArray(sent) && sent?.length > 0) {
-        await slack.sendStripeAlert({
-          data: {
-            amountTotal,
-            sent: sent.length,
-            distrib: sent.map(
-              ({ userName, displayName, amount }: any) =>
-                `${displayName} @${userName} ${amount} USDT`
-            ),
-          },
-          message,
-          state: SLACK_MESSAGE_STATE.successful,
-        })
-      }
+      // if (Array.isArray(sent) && sent?.length > 0) {
+      //   await slack.sendStripeAlert({
+      //     data: {
+      //       amountTotal,
+      //       sent: sent.length,
+      //       distrib: sent.map(
+      //         ({ userName, displayName, amount }: any) =>
+      //           `${displayName} @${userName} ${amount} USDT`
+      //       ),
+      //     },
+      //     message,
+      //     state: SLACK_MESSAGE_STATE.successful,
+      //   })
+      // }
       return {
         statusCode: 200,
         body: message,
@@ -191,11 +193,11 @@ export const handler = async (
     path === '/qf-calculator' &&
     accept?.startsWith('application/json')
   ) {
-    const { fromTime, toTime, fromBlock, toBlock, amountTotal, finalize } = (
+    const { fromBlock, toBlock, amountTotal, finalize } = (
       event?.forceRun ? event : queryStringParameters
     ) as InputBodyParameters
 
-    const { root, gist_url } =
+    const { root } =
       (await calculateQFScore({
         // fromTime, toTime,
         fromBlock: BigInt(fromBlock),
@@ -218,7 +220,47 @@ export const handler = async (
       body: JSON.stringify({
         message: 'done.',
         root, // tree
-        gist_url,
+      }),
+    }
+  } else if (
+    method === 'POST' &&
+    path === '/qf-finalize' &&
+    accept?.startsWith('application/json')
+  ) {
+    const { fromBlock, toBlock } = (
+      event?.forceRun ? event : queryStringParameters
+    ) as InputBodyParameters
+
+    if (!fromBlock || !toBlock) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          message: 'bad parameters, fromBlock and toBlock are required.',
+        }),
+      }
+    }
+
+    const { root } =
+      (await finalizeQFScore({
+        fromBlock: BigInt(fromBlock),
+        toBlock: BigInt(toBlock),
+      })) || {}
+
+    if (!root) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          message: 'bad parameters, no tree root, check logs for details.',
+        }),
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({
+        message: 'done.',
+        root,
       }),
     }
   }
