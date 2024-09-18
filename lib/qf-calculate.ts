@@ -1154,16 +1154,29 @@ this is analyzing results with [Quadratic Funding score calcuation with Pairwise
       }
 
       let remsh = total_shares
-      firstNonZero = totals.findIndex((p) => p.shares > 0)
-      for (let i = firstNonZero + 1; i < totals.length; i++) {
-        remsh -= totals[i].shares
-      }
-      if (totals[firstNonZero].shares != remsh) {
-        console.log(
-          new Date(),
-          `adjust [${firstNonZero}].shares: from ${totals[firstNonZero].shares} to ${remsh}`
-        )
-        totals[firstNonZero].shares = remsh
+      const totalCalculatedShares = totals.reduce(
+        (sum, proj) => sum + proj.shares,
+        0
+      )
+
+      if (totalCalculatedShares !== total_shares) {
+        const scaleFactor = total_shares / totalCalculatedShares
+
+        for (let i = 0; i < totals.length; i++) {
+          const newShares = Math.round(totals[i].shares * scaleFactor)
+          remsh -= newShares
+          totals[i].shares = newShares
+        }
+
+        // Distribute any remaining shares
+        let i = 0
+        while (remsh !== 0) {
+          if (totals[i].shares > 0) {
+            totals[i].shares += remsh > 0 ? 1 : -1
+            remsh += remsh > 0 ? -1 : 1
+          }
+          i = (i + 1) % totals.length
+        }
       }
     }
 
