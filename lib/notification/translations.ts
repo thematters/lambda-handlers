@@ -90,18 +90,18 @@ export default {
       `Your article "${title}" has been reported by other users`,
   }),
   write_challenge_applied: i18n({
-    zh_hant: `你已成功報名七日書，點此閱讀公告查看詳情，了解如何發文、完成七天寫作`,
-    zh_hans: `你已成功报名七日书，点此阅读公告查看详情，了解如何发文、完成七天写作`,
-    en: `Your Free Write in 7 days application has been submitted successfully. Click here to read the announcement in detail and learn how to publish an article and complete the activity`,
+    zh_hant: `你已成功報名三日書，點此閱讀公告查看詳情，了解如何發文、完成三天寫作`,
+    zh_hans: `你已成功报名三日书，点此阅读公告查看详情，了解如何发文、完成三天写作`,
+    en: `Your Free Write in 3 days application has been submitted successfully. Click here to read the announcement in detail and learn how to publish an article and complete the activity`,
   }),
   write_challenge_applied_late_bird: i18n({
-    zh_hant: `歡迎晚鳥參與七日書，點此閱讀公告查看詳情，了解如何發文、完成七天寫作`,
-    zh_hans: `欢迎晚鸟参与七日书，点此阅读公告查看详情，了解如何发文、完成七天写作`,
-    en: `You joined Free Write in 7 days as a latecomer successfully . Click here to read the announcement in detail and learn how to publish an article and complete the activity`,
+    zh_hant: `歡迎晚鳥參與三日書，點此閱讀公告查看詳情，了解如何發文、完成三天寫作`,
+    zh_hans: `欢迎晚鸟参与三日书，点此阅读公告查看详情，了解如何发文、完成三天写作`,
+    en: `You joined Free Write in 3 days as a latecomer successfully . Click here to read the announcement in detail and learn how to publish an article and complete the activity`,
   }),
   badge_grand_slam_awarded: i18n({
-    zh_hant: '太棒了！恭喜獲得七日書大滿貫，快去看看你的新徽章',
-    zh_hans: '太棒了！恭喜获得七日书大满贯，快去看看你的新徽章',
+    zh_hant: '太棒了！恭喜獲得三日書大滿貫，快去看看你的新徽章',
+    zh_hans: '太棒了！恭喜获得三日书大满贯，快去看看你的新徽章',
     en: 'Marvelous! Congratulations on winning the Seven-Day Free Writing Grand Slam, go check out your new badge',
   }),
 }
