@@ -62,6 +62,9 @@ describe('user notify setting', () => {
     // comment-comment
     comment_new_reply: true,
 
+    // campaign-article
+    campaign_article_featured: true,
+
     // transaction
     payment_received_donation: true,
 
