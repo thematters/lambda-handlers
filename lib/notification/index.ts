@@ -503,7 +503,6 @@ export class NotificationService {
       moment_mentioned_you: setting.mention,
 
       // comment
-
       article_comment_liked: setting.newLike,
       moment_comment_liked: setting.newLike,
       article_comment_mentioned_you: setting.mention,
@@ -514,6 +513,9 @@ export class NotificationService {
 
       // comment-comment
       comment_new_reply: setting.newComment,
+
+      // campaign-article
+      campaign_article_featured: true,
 
       // transaction
       payment_received_donation: true,
@@ -581,6 +583,7 @@ export class NotificationService {
       case NOTICE_TYPE.article_published:
       case NOTICE_TYPE.revised_article_published:
       case NOTICE_TYPE.revised_article_not_published:
+      case NOTICE_TYPE.campaign_article_featured:
       case NOTICE_TYPE.circle_new_article: // deprecated
         return {
           type: params.event,
